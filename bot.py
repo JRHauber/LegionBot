@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord.utils import get
 import random
 import math
-from requests import Request
+from resource_requests import Request
 import pickle
 
 intents = discord.Intents.default()
