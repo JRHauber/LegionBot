@@ -16,6 +16,7 @@ try:
 except FileNotFoundError:
     resource_requests = []
 
+# create in promise on init
 profession_roles = {
     'foraging': 1267585190981796021,
     'hunting': 1267585359986823168,
@@ -35,7 +36,7 @@ profession_roles = {
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
-    
+
 
 
 @bot.command()
@@ -102,5 +103,8 @@ async def requests(ctx):
             out += ' ' + str(resource_requests[i].id) + ' - ' + resource_requests[i].cname.capitalize() + ' - ' + resource_requests[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
     await ctx.message.delete()
-       
-bot.run('MTI2NzU4Mzk3NDE4ODkwODY0NA.GWE-ZM.uBNJbEm-KxZPIBkftv_6VECVBhiMqBi8XgJgi0')
+
+with open('secrets', 'r') as sf:
+    token = sf.readline().strip()
+
+bot.run(token)
