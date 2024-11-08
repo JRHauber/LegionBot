@@ -229,7 +229,7 @@ async def pinfo(ctx):
     await pname.delete()
     await pview.delete()
 @bot.command()
-async def finishproject(ctx):
+async def finishProject(ctx):
     pview = await ctx.send("What project are you completing?")
     pname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     if project_list == []:
