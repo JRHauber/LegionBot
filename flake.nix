@@ -16,26 +16,14 @@
 
           python = pkgs.python3.override {
             self = python;
-            packageOverrides = python-self: python-super: {
-              redshift-connector = python-super.redshift-connector.overridePythonAttrs (oldAttrs: {
-                # redshift-connector tests don't work
-                doCheck = false;
-              });
-              google-cloud-bigquery = python-super.google-cloud-bigquery.overridePythonAttrs (oldAttrs: {
-                # this package marked as broken, so normally we need run NIXPKGS_ALLOW_BROKEN=1; nix develop --impure
-                # however, we can override that here, because we like to live dangerously
-                meta = oldAttrs.meta // { broken = false; };
-                doCheck = false;
-                propagatedBuildInputs = oldAttrs.propagatedBuildInputs ++ [ python-super.packaging ];
-              });
-            };
+            packageOverrides = python-self: python-super: { };
           };
 
         in
         with pkgs;
         {
           devShells.default = mkShell {
-            name = "soip reports";
+            name = "Bot Flake";
             packages = [
               # put any non-Python packages here
               google-cloud-sdk
