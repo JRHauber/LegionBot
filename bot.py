@@ -1,8 +1,6 @@
 ﻿import discord
 from discord.ext import commands
 from discord.utils import get
-import random
-import math
 from resource_requests import Request
 from projects import Project
 import pickle
