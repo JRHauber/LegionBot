@@ -25,8 +25,6 @@
           devShells.default = mkShell {
             name = "Bot Flake";
             packages = [
-              # put any non-Python packages here
-              google-cloud-sdk
               # Python packages:
               (python.withPackages (p: with p; [
                 requests
