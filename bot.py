@@ -1,8 +1,6 @@
 ﻿import discord
 from discord.ext import commands
 from discord.utils import get
-import random
-import math
 from resource_requests import Request
 from projects import Project
 import pickle
@@ -24,8 +22,9 @@ try:
     project_list = pickle.load(open("project_list.p", "rb"))
 except FileNotFoundError:
     project_list = []
-    
 
+
+# create in promise on init
 profession_roles = {
     'foraging': 1267585190981796021,
     'hunting': 1267585359986823168,
@@ -46,7 +45,7 @@ profession_roles = {
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
-    
+
 
 @bot.command()
 async def setup(ctx):
@@ -160,7 +159,7 @@ async def newProject(ctx):
     await ctx.message.delete()
     await rans.delete()
     await name.delete()
-    
+
 
 @bot.command()
 async def contribute(ctx):
@@ -190,7 +189,7 @@ async def contribute(ctx):
     await rname.delete()
     await rcount.delete()
     pickle.dump( project_list, open("project_list.p", "wb"))
-    
+
 
 @bot.command()
 async def projects(ctx):
@@ -246,4 +245,8 @@ async def finishProject(ctx):
                 await ctx.send("Sorry, there is no project under that name. Use the projects command to see the list!", delete_after=30.0)
     await pview.delete()
     await pname.delete()
-bot.run('MTI2NzU4Mzk3NDE4ODkwODY0NA.GWE-ZM.uBNJbEm-KxZPIBkftv_6VECVBhiMqBi8XgJgi0')
+
+with open('secrets', 'r') as sf:
+    token = sf.readline().strip()
+
+bot.run(token)
