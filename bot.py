@@ -4,6 +4,7 @@ from discord.utils import get
 from resource_requests import Request
 from projects import Project
 import pickle
+import time
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -132,6 +133,7 @@ async def requests(ctx):
 
 @bot.command()
 async def newProject(ctx):
+    maxTime = time.time() + 60
     bot_message = await ctx.send("Creating a new project: What's the project's name?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     for p in project_list:
@@ -144,6 +146,12 @@ async def newProject(ctx):
     resources = {}
     doLoop = True
     while doLoop:
+        if time.time() > maxTime:
+            await ctx.send("Sorry you took too long! This has a maximum time of 60 seconds.", delete_after=10.0)
+            await bot_message.delete()
+            await project_name.delete()
+            await bot_confirm.delete()
+            return
         resource_ask = await ctx.send("What's the name of the resource?")
         resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         await resource_name.delete()
