@@ -1,4 +1,4 @@
-﻿class Request:
+﻿class resourceRequest:
     def __init__(self, id, requestor_name, requestor_mention, requestor_id, claimant_name, claimant_mention, claimant_id, resource):
         self.id = id
         self.requestor_name = requestor_name

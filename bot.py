@@ -1,7 +1,7 @@
 ﻿import discord
 from discord.ext import commands
 from discord.utils import get
-from resource_requests import Request
+from resource_requests import resourceRequest
 from projects import Project
 import pickle
 import time
@@ -44,6 +44,8 @@ profession_roles = {
        
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
+def findRequest(id):
+    return next((i for i in requests_list if i.id == id), -1)
 
 @bot.event
 async def on_ready():
@@ -55,63 +57,64 @@ async def setup(ctx):
 @bot.command()
 async def request(ctx, role= "foraging", *, message="Test Message"):
         j=1
-        if requests_list != []:
-            for i in range(len(requests_list)):
-                if requests_list[i].id == j:
-                    j += 1
+        if requests_list == []:
+            j = 1
         else:
-            id = 1
+            while True:
+                if findRequest(j) == -1:
+                    break        
+                else:
+                    j += 1
         id = j
+        
         sent = await ctx.send(f"""
                 {get(ctx.guild.roles, id=profession_roles[role.lower()]).mention}
                 Requester: {ctx.author.mention}
                 Message: {message}
                 ID: {id}
                 """)
-        r = Request(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message)
-        print(r.requestor_name)
+        r = resourceRequest(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message)
         requests_list.append(r)
-        print(requests_list)
         pickle.dump( requests_list, open("requests.p", "wb"))
         await ctx.message.delete()
 
 @bot.command()
 async def claim(ctx, id= -1):
-    for i in range(len(requests_list)):
-        if requests_list[i].id == int(id):
-            await ctx.send(f"""
-                           {requests_list[i].requestor_mention}
-                           Claimant: {ctx.author.display_name.capitalize()}
-                           Resource: {requests_list[i].resource}
-                           ID: {requests_list[i].id}
-                           """)
-            requests_list[i].claimant_name = ctx.author.display_name
-            requests_list[i].claimant_id = ctx.author.id
-            requests_list[i].claimant_mention = ctx.author.mention
-            pickle.dump( requests_list, open("requests.p", "wb"))
-            await ctx.message.delete()
-            return
-    await ctx.send("Invalid ID! Check your numbers!")
+    currentRequest = findRequest(id)
+    if currentRequest == -1:
+        await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
+        return
+    
+    await ctx.send(f"""
+                    {currentRequest.requestor_mention}
+                    Claimant: {ctx.author.display_name.capitalize()}
+                    Resource: {currentRequest.resource}
+                    ID: {currentRequest.id}
+                    """)
+    
+    currentRequest.claimant_name = ctx.author.display_name
+    currentRequest.claimant_id = ctx.author.id
+    currentRequest.claimant_mention = ctx.author.mention
+    pickle.dump( requests_list, open("requests.p", "wb"))
     await ctx.message.delete()
 
 @bot.command()
 async def complete(ctx, id=-1):
-    if id == -1:
-        await ctx.send("Please enter an id when typing this command", delete_after=10.0)
-        await ctx.message.delete()
+    currentRequest = findRequest(id)
+    if currentRequest == -1:
+        await ctx.send("Please enter a proper ID!", delete_after=10.0)
         return
-    for i in range(len(requests_list)):
-        if requests_list[i].id == int(id):
-            await ctx.send(f"""
-                           {requests_list[i].requestor_mention}
-                           Completer: {ctx.author.display_name.capitalize()}
-                           Resource: {requests_list[i].resource}
-                           ID: {requests_list[i].id}
-                           """)
-            requests_list.pop(i)
-            pickle.dump( requests_list, open("requests.p", "wb"))
-            await ctx.message.delete()
-            return
+    
+    await ctx.send(f"""
+                        {currentRequest.requestor_mention}
+                        Completer: {ctx.author.display_name.capitalize()}
+                        Resource: {currentRequest.resource}
+                        ID: {currentRequest.id}
+                        """)
+    
+    requests_list.remove(currentRequest)
+    pickle.dump( requests_list, open("requests.p", "wb"))
+    await ctx.message.delete()
 
 @bot.command()
 async def claims(ctx):
@@ -175,7 +178,6 @@ async def newProject(ctx):
             await resource_ans.delete()
             
     temp = Project(project_name.content.lower(), resources)
-    print(temp.resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
     await ctx.send("Your project has been created!", delete_after=10.0)
