@@ -2,7 +2,7 @@ class Database():
     def __init__(self, **kwargs) -> None:
         self.setup_db(**kwargs)
 
-    async def setup_db(self):
+    def setup_db(self):
         raise NotImplementedError()
 
     async def insert_request(self, server_id : int, requester_id : int, resource_message : str) -> int:
