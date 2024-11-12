@@ -8,6 +8,9 @@ class DatabaseSqlite(database.Database):
     database_name = "database.db"
     lock = None
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
     def setup_db(self, database_name : str = "database.db") -> None:
         assert database_name
 
@@ -101,18 +104,42 @@ class DatabaseSqlite(database.Database):
     async def insert_server(self):
         pass
 
+    async def clear_all(self):
+        await self.lock.acquire()
+        try:
+            self.db.execute("DELETE FROM requests WHERE 1;")
+        finally:
+            self.lock.release()
+
+
+async def __test_insert(db : DatabaseSqlite):
+    await db.clear_all()
+    await db.insert_request(1, 1, "this is the message")
+    print(await db.get_requests())
+
+async def __test_claim(db : DatabaseSqlite):
+    await db.clear_all()
+    id, *rest = await db.insert_request(1, 1, "this is the message")
+    print(await db.claim_request(id, 1, 1))
+    print(await db.get_requests())
+
+async def __test_complete(db : DatabaseSqlite):
+    await db.clear_all()
+    id, *rest = await db.insert_request(1, 1, "this is the message")
+    print(await db.claim_request(id, 1, 1))
+    print(await db.finish_request(id, 1, 1))
+    print(await db.get_requests())
+
 async def __main():
     print("queue tests")
-    db = DatabaseSqlite()
+    db = DatabaseSqlite(database_name="test.db")
 
-    async def insert_read():
-        await db.insert_request(1, 1, "this is the message")
-        await db.get_requests()
-
-    tasks = [asyncio.create_task(insert_read()) for _ in range(10)]
-    await asyncio.gather(*tasks)
-
-    print(await db.get_requests())
+    await __test_insert(db)
+    print()
+    await __test_claim(db)
+    print()
+    await __test_complete(db)
+    print()
 
 
 if __name__=="__main__":
