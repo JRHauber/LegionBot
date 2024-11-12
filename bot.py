@@ -40,20 +40,7 @@ profession_roles = {
     'fishing': 1267585808186081311,
     'forestry': 1267585920773918752
 }
-
-def getDictFromList(key, value, list):
-    if list == []:
-        #if the list is empty, return error code -1
-        return -1
-    else:
-        for d in list:
-            for k in d:
-                if k == key:
-                    if d[k] == value:
-                        return d
-                        # if the value matches what we're looking for (name, id, etc) return the dict
-        #if none of the dicts contain the right value, return error code -2
-        return -2            
+       
 
 
 @bot.event
