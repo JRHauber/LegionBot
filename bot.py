@@ -41,6 +41,20 @@ profession_roles = {
     'forestry': 1267585920773918752
 }
 
+def getDictFromList(key, value, list):
+    if list == []:
+        #if the list is empty, return error code -1
+        return -1
+    else:
+        for d in list:
+            for k in d:
+                if k == key:
+                    if d[k] == value:
+                        return d
+                        # if the value matches what we're looking for (name, id, etc) return the dict
+        #if none of the dicts contain the right value, return error code -2
+        return -2            
+
 
 @bot.event
 async def on_ready():
@@ -66,8 +80,8 @@ async def request(ctx, role= "foraging", *, message="Test Message"):
                 Message: {message}
                 ID: {id}
                 """)
-        r = Request(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message, sent.id)
-        print(r.rname)
+        r = Request(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message)
+        print(r.requestor_name)
         requests_list.append(r)
         print(requests_list)
         pickle.dump( requests_list, open("requests.p", "wb"))
@@ -78,14 +92,14 @@ async def claim(ctx, id= -1):
     for i in range(len(requests_list)):
         if requests_list[i].id == int(id):
             await ctx.send(f"""
-                           {requests_list[i].rmention}
+                           {requests_list[i].requestor_mention}
                            Claimant: {ctx.author.display_name.capitalize()}
                            Resource: {requests_list[i].resource}
                            ID: {requests_list[i].id}
                            """)
-            requests_list[i].cname = ctx.author.display_name
-            requests_list[i].cid = ctx.author.id
-            requests_list[i].cmention = ctx.author.mention
+            requests_list[i].claimant_name = ctx.author.display_name
+            requests_list[i].claimant_id = ctx.author.id
+            requests_list[i].claimant_mention = ctx.author.mention
             pickle.dump( requests_list, open("requests.p", "wb"))
             await ctx.message.delete()
             return
@@ -97,7 +111,7 @@ async def complete(ctx, id=-1):
     for i in range(len(requests_list)):
         if requests_list[i].id == int(id):
             await ctx.send(f"""
-                           {requests_list[i].rmention}
+                           {requests_list[i].requestor_mention}
                            Completer: {ctx.author.display_name.capitalize()}
                            Resource: {requests_list[i].resource}
                            ID: {requests_list[i].id}
@@ -111,8 +125,8 @@ async def complete(ctx, id=-1):
 async def claims(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].cid == ctx.author.id:
-            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].rname.capitalize() + ' - ' + requests_list[i].resource + '\n'
+        if requests_list[i].claimant_id == ctx.author.id:
+            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
     await ctx.message.delete()
 
@@ -120,8 +134,8 @@ async def claims(ctx):
 async def requests(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].rid == ctx.author.id:
-            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].cname.capitalize() + ' - ' + requests_list[i].resource + '\n'
+        if requests_list[i].requestor_id == ctx.author.id:
+            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
     await ctx.message.delete()
 
@@ -245,6 +259,7 @@ async def finishProject(ctx):
                 await ctx.send("Sorry, there is no project under that name. Use the projects command to see the list!", delete_after=30.0)
     await pview.delete()
     await pname.delete()
+    await ctx.delete()
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
