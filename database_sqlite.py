@@ -1,78 +1,119 @@
 import database
 import sqlite3
 import asyncio
-import queue
-import time
+import re
 
 class DatabaseSqlite(database.Database):
-    pool = None
+    db = None
     database_name = "database.db"
+    lock = None
 
-
-    def setup_db(self, database_name : str, pool_size : int = 1) -> None:
-        assert pool_size > 0
+    def setup_db(self, database_name : str = "database.db") -> None:
         assert database_name
 
-        self.pool = queue.LifoQueue(pool_size)
-        for _ in range(pool_size):
-            self.pool.put_nowait(sqlite3.connect(database_name, check_same_thread=False))
+        self.db = sqlite3.connect(database_name, check_same_thread=False)
 
-        db = self.pool.get()
+        self.lock = asyncio.Lock()
+
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                server_id INTEGER NOT NULL,
+                filled BOOL NOT NULL,
+                requester_id INTEGER NOT NULL,
+                claimant_id INTEGER,
+                resource_message TEXT NOT NULL
+            );
+            """
+        )
+
+    async def insert_request(self, server_id : int, requester_id : int, resource_message : str) -> int:
+        await self.lock.acquire()
         try:
-            print("table create")
-            db.execute(
+            cursor = self.db.cursor()
+            sanitary_message = re.sub(r'[^a-zA-Z0-9 ]+', '', resource_message)
+            res = cursor.execute(f"""
+                INSERT INTO requests
+                (server_id, requester_id, resource_message, filled)
+                VALUES ({server_id}, {requester_id}, "{sanitary_message}", FALSE)
+                RETURNING *;
                 """
-                CREATE TABLE IF NOT EXISTS requests (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT
-                );
-                """)
+            )
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
         finally:
-            print("return resource")
-            self.pool.put(db)
-        print("db setup")
+            self.lock.release()
+        return data
 
-    async def insert_request(self):
-        assert self.pool is not None
-        db = self.pool.get()
-        cursor = db.cursor()
-        cursor.execute("INSERT INTO requests DEFAULT VALUES;")
-        db.commit()
-        cursor.close()
-        self.pool.put(db)
+    async def claim_request(self, id : int, server_id : int, claimant_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                UPDATE requests
+                SET claimant_id = {claimant_id}
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id IS NULL
+                RETURNING *;
+                """
+            )
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
 
+    async def finish_request(self, id : int, server_id : int, claimant_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                UPDATE requests
+                SET filled = {claimant_id}
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id}
+                RETURNING *;
+                """
+            )
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    # dont use this
     async def get_requests(self):
-        assert self.pool is not None
-        db = self.pool.get()
-        cursor = db.cursor()
-        res = cursor.execute("SELECT * FROM REQUESTS;")
-        data = res.fetchall()
-        self.pool.put(db)
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute("SELECT * FROM REQUESTS;")
+            data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
         return data
 
     async def insert_project(self):
-        assert self.pool is not None
+        pass
 
     async def insert_server(self):
-        assert self.pool is not None
+        pass
 
 async def __main():
     print("queue tests")
     db = DatabaseSqlite()
-    db.setup_db("test.db", pool_size=1)
 
     async def insert_read():
-        await db.insert_request()
+        await db.insert_request(1, 1, "this is the message")
         await db.get_requests()
 
-
-    start = time.time()
-    tasks = [asyncio.create_task(insert_read()) for _ in range(10000)]
+    tasks = [asyncio.create_task(insert_read()) for _ in range(10)]
     await asyncio.gather(*tasks)
-    end = time.time()
 
+    print(await db.get_requests())
 
-    print(len(await db.get_requests()))
-    print(end - start)
 
 if __name__=="__main__":
     asyncio.run(__main())

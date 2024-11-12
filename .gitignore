@@ -1,3 +1,4 @@
 ﻿*.p
 __pycache__
 secrets
+*.db
