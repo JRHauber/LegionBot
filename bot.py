@@ -41,7 +41,7 @@ profession_roles = {
     'fishing': 1267585808186081311,
     'forestry': 1267585920773918752
 }
-       
+
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
 def findRequest(id):
@@ -62,11 +62,11 @@ async def request(ctx, role= "foraging", *, message="Test Message"):
         else:
             while True:
                 if findRequest(j) == -1:
-                    break        
+                    break
                 else:
                     j += 1
         id = j
-        
+
         sent = await ctx.send(f"""
                 {get(ctx.guild.roles, id=profession_roles[role.lower()]).mention}
                 Requester: {ctx.author.mention}
@@ -76,7 +76,6 @@ async def request(ctx, role= "foraging", *, message="Test Message"):
         r = resourceRequest(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message)
         requests_list.append(r)
         pickle.dump( requests_list, open("requests.p", "wb"))
-        await ctx.message.delete()
 
 @bot.command()
 async def claim(ctx, id= -1):
@@ -96,7 +95,6 @@ async def claim(ctx, id= -1):
     currentRequest.claimant_id = ctx.author.id
     currentRequest.claimant_mention = ctx.author.mention
     pickle.dump( requests_list, open("requests.p", "wb"))
-    await ctx.message.delete()
 
 @bot.command()
 async def complete(ctx, id=-1):
@@ -114,7 +112,6 @@ async def complete(ctx, id=-1):
     
     requests_list.remove(currentRequest)
     pickle.dump( requests_list, open("requests.p", "wb"))
-    await ctx.message.delete()
 
 @bot.command()
 async def claims(ctx):
@@ -123,7 +120,6 @@ async def claims(ctx):
         if requests_list[i].claimant_id == ctx.author.id:
             out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
-    await ctx.message.delete()
 
 @bot.command()
 async def requests(ctx):
@@ -132,7 +128,6 @@ async def requests(ctx):
         if requests_list[i].requestor_id == ctx.author.id:
             out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
-    await ctx.message.delete()
 
 @bot.command()
 async def newProject(ctx):
@@ -145,7 +140,7 @@ async def newProject(ctx):
         await bot_message.delete()
         await project_name.delete()
         return
-    
+
     bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")    
     resources = {}
     doLoop = True
@@ -156,7 +151,7 @@ async def newProject(ctx):
             await project_name.delete()
             await bot_confirm.delete()
             return
-        
+
         resource_ask = await ctx.send("What's the name of the resource?")
         resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         await resource_name.delete()
@@ -176,14 +171,13 @@ async def newProject(ctx):
         else:
             await resource_ask.delete()
             await resource_ans.delete()
-            
+
     temp = Project(project_name.content.lower(), resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
     await ctx.send("Your project has been created!", delete_after=10.0)
-    
+
     await bot_message.delete()
-    await ctx.message.delete()
     await resource_ans.delete()
     await project_name.delete()
     await bot_confirm.delete()
@@ -194,14 +188,14 @@ async def contribute(ctx):
     bot_message = await ctx.send("What project did you contribute to?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     current_project = findProject(project_name.content.lower())
-    
+
     if current_project == -1:
         await ctx.send("Sorry, I don't see a project under that name! Use the `projects` command to see a list of active projects!", delete_after=10.0)
         await bot_message.delete()
         await project_name.delete()
         return
     await project_name.delete()
-          
+
     output = '```'
     output += f'\nProject: {current_project.name.title()}'
     for k in current_project.resources:
@@ -210,7 +204,7 @@ async def contribute(ctx):
         output += f"\n{k}: {v}/{w}"
     output += "```"
     await ctx.send(output)
-    
+
     resource_ask = await ctx.send("What resource did you contribute?")
     resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     if not resource_name.content.lower() in current_project.resources:
@@ -218,7 +212,7 @@ async def contribute(ctx):
         await bot_message.delete()
         return
     await resource_ask.delete()
-    
+
     count_ask = await ctx.send("How many of that resource did you add?")
     resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     await count_ask.delete()
@@ -226,13 +220,11 @@ async def contribute(ctx):
         await ctx.send("Sorry it doesn't look like that resource is in that project. Use the pinfo command to double check you named it right!", delete_after=10.0)
         return
     await ctx.send("Added your contribution! Thank you for contributing!", delete_after=10.0)
-    
-    await ctx.message.delete()
+
     await bot_message.delete()
     await resource_name.delete()
     await resource_count.delete()
     pickle.dump( project_list, open("project_list.p", "wb"))
-
 
 @bot.command()
 async def projects(ctx):
@@ -255,8 +247,8 @@ async def pinfo(ctx):
     current_project = findProject(project_name.content.lower())
     if current_project == -1:
         await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=10.0)
-        return    
-    
+        return
+
     output += f'\nProject: {current_project.name.title()}'
     output = '```'
     output += f'\nProject: {current_project.name.title()}'
@@ -265,9 +257,8 @@ async def pinfo(ctx):
         w = current_project.maxResources[k]
         output += f"\n{k}: {v}/{w}"
     output += "```"
-    await ctx.send(output)    
-                
-    await ctx.message.delete()
+    await ctx.send(output)
+
     await project_name.delete()
     await project_ask.delete()
 
@@ -275,12 +266,12 @@ async def pinfo(ctx):
 async def finishProject(ctx):
     project_ask = await ctx.send("What project are you completing?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    
+
     current_project = findProject(project_name.content.lower())
     if current_project == -1:
         await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=10.0)
-        return    
-    
+        return
+
     output1 = current_project.completeProject()
     output2 = current_project.getContributions()
     await ctx.send(output1)
@@ -289,7 +280,6 @@ async def finishProject(ctx):
 
     await project_ask.delete()
     await project_name.delete()
-    await ctx.message.delete()
     pickle.dump( project_list, open("project_list.p", "wb"))
 
 with open('secrets', 'r') as sf:
