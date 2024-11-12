@@ -199,6 +199,16 @@ async def contribute(ctx):
             await bot_message.delete()
             await project_name.delete()
             return
+    output = '```'
+    output += f'\nProject: {currentProject.name.title()}'
+    for k in currentProject.resources:
+        v = currentProject.resources[k]
+        for i in currentProject.maxResources:
+            j = currentProject.maxResources[i]
+            if i == k:
+                output += f"\n{i}: {v}/{j}"
+            output += "```"
+    await ctx.send(output)
     resource_ask = await ctx.send("What resource did you contribute?")
     resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     if not resource_name.content.lower() in currentProject.resources:
