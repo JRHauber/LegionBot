@@ -108,6 +108,10 @@ async def claim(ctx, id= -1):
 
 @bot.command()
 async def complete(ctx, id=-1):
+    if id == -1:
+        await ctx.send("Please enter an id when typing this command", delete_after=10.0)
+        await ctx.message.delete()
+        return
     for i in range(len(requests_list)):
         if requests_list[i].id == int(id):
             await ctx.send(f"""
@@ -143,7 +147,13 @@ async def requests(ctx):
 async def newProject(ctx):
     bot_message = await ctx.send("Creating a new project: What's the project's name?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
+    for p in project_list:
+        if p.name.lower() == project_name.content.lower():
+            await ctx.send("Sorry that name is in use. Please pick another!", delete_after=10.0)
+            await bot_message.delete()
+            await project_name.delete()
+            return
+    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
     resources = {}
     doLoop = True
     while doLoop:
@@ -155,7 +165,7 @@ async def newProject(ctx):
         resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         await resource_count.delete()
         await resource_ask.delete()
-        resources[resource_name.content] = int(resource_count.content)
+        resources[resource_name.content.lower()] = int(resource_count.content)
         resource_ask = await ctx.send("Are you done adding resources?")
         resource_ans = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         if resource_ans.content.lower() == "done":
@@ -165,14 +175,15 @@ async def newProject(ctx):
             await resource_ask.delete()
             await resource_ans.delete()
     temp = Project(project_name.content.lower(), resources)
+    print(temp.resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
-    print("LOGGED")
     await ctx.send("Your project has been created!", delete_after=10.0)
     await bot_message.delete()
     await ctx.message.delete()
     await resource_ans.delete()
     await project_name.delete()
+    await bot_confirm.delete()
 
 
 @bot.command()
@@ -190,6 +201,10 @@ async def contribute(ctx):
             return
     resource_ask = await ctx.send("What resource did you contribute?")
     resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    if not resource_name.content.lower() in currentProject.resources:
+        await ctx.send("That resource isn't a part of this project, check pinfo and try again", delete_after=10.0)
+        await bot_message.delete()
+        return
     await resource_ask.delete()
     count_ask = await ctx.send("How many of that resource did you add?")
     resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
@@ -241,6 +256,7 @@ async def pinfo(ctx):
     await ctx.message.delete()
     await project_name.delete()
     await project_ask.delete()
+
 @bot.command()
 async def finishProject(ctx):
     project_ask = await ctx.send("What project are you completing?")
@@ -259,7 +275,8 @@ async def finishProject(ctx):
                 await ctx.send("Sorry, there is no project under that name. Use the projects command to see the list!", delete_after=30.0)
     await project_ask.delete()
     await project_name.delete()
-    await ctx.delete()
+    await ctx.message.delete()
+    pickle.dump( project_list, open("project_list.p", "wb"))
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
