@@ -141,67 +141,67 @@ async def requests(ctx):
 
 @bot.command()
 async def newProject(ctx):
-    botans = await ctx.send("Creating a new project: What's the project's name?")
-    name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    bot_message = await ctx.send("Creating a new project: What's the project's name?")
+    project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
     resources = {}
     doLoop = True
     while doLoop:
-        rask = await ctx.send("What's the name of the resource?")
-        rname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-        await rname.delete()
-        await rask.delete()
-        rask = await ctx.send("How many of that resource do you need?")
-        rcount = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-        await rcount.delete()
-        await rask.delete()
-        resources[rname.content] = int(rcount.content)
-        rask = await ctx.send("Are you done adding resources?")
-        rans = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-        if rans.content.lower() == "done":
+        resource_ask = await ctx.send("What's the name of the resource?")
+        resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+        await resource_name.delete()
+        await resource_ask.delete()
+        resource_ask = await ctx.send("How many of that resource do you need?")
+        resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+        await resource_count.delete()
+        await resource_ask.delete()
+        resources[resource_name.content] = int(resource_count.content)
+        resource_ask = await ctx.send("Are you done adding resources?")
+        resource_ans = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+        if resource_ans.content.lower() == "done":
             doLoop = False
-            await rask.delete()
+            await resource_ask.delete()
         else:
-            await rask.delete()
-            await rans.delete()
-    temp = Project(name.content.lower(), resources)
+            await resource_ask.delete()
+            await resource_ans.delete()
+    temp = Project(project_name.content.lower(), resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
     print("LOGGED")
-    await ctx.send("Your project has been created!", delete_after=30.0)
-    await botans.delete()
+    await ctx.send("Your project has been created!", delete_after=10.0)
+    await bot_message.delete()
     await ctx.message.delete()
-    await rans.delete()
-    await name.delete()
+    await resource_ans.delete()
+    await project_name.delete()
 
 
 @bot.command()
 async def contribute(ctx):
-    botans = await ctx.send("What project did you contribute to?")
-    pname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    bot_message = await ctx.send("What project did you contribute to?")
+    project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     for p in project_list:
-        if p.name.lower() == pname.content.lower():
+        if p.name.lower() == project_name.content.lower():
             currentProject = p
-            await pname.delete()
+            await project_name.delete()
         else:
-            await ctx.send("Sorry, I don't see a project under that name! Use the `projects` command to see a list of active projects!", delete_after=30.0)
-            await botans.delete()
-            await pname.delete()
+            await ctx.send("Sorry, I don't see a project under that name! Use the `projects` command to see a list of active projects!", delete_after=15.0)
+            await bot_message.delete()
+            await project_name.delete()
             return
-    botask = await ctx.send("What resource did you contribute?")
-    rname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    await botask.delete()
-    botask = await ctx.send("How many of that resource did you add?")
-    rcount = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    await botask.delete()
-    if currentProject.addContribution(ctx.author.display_name.lower(), rname.content.lower(), int(rcount.content)) == -1:
+    resource_ask = await ctx.send("What resource did you contribute?")
+    resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    await resource_ask.delete()
+    count_ask = await ctx.send("How many of that resource did you add?")
+    resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    await count_ask.delete()
+    if currentProject.addContribution(ctx.author.display_name.lower(), resource_name.content.lower(), int(resource_count.content)) == -1:
         await ctx.send("Sorry it doesn't look like that resource is in that project. Use the pinfo command to double check you named it right!", delete_after=30.0)
     else:
         await ctx.send("Added your contribution! Thank you for contributing!", delete_after=30.0)
     await ctx.message.delete()
-    await botans.delete()
-    await rname.delete()
-    await rcount.delete()
+    await bot_message.delete()
+    await resource_name.delete()
+    await resource_count.delete()
     pickle.dump( project_list, open("project_list.p", "wb"))
 
 
@@ -219,14 +219,14 @@ async def projects(ctx):
 
 @bot.command()
 async def pinfo(ctx):
-    pview = await ctx.send("What project do you want to view?")
-    pname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    project_ask = await ctx.send("What project do you want to view?")
+    project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     output = "```"
     if project_list == []:
-        await ctx.send("There are no active projects right now!", delete_after=30.0)
+        await ctx.send("There are no active projects right now!", delete_after=15.0)
     else:
         for p in project_list:
-            if p.name.lower() == pname.content.lower():
+            if p.name.lower() == project_name.content.lower():
                 output += f'\nProject: {p.name.title()}'
                 for k in p.resources:
                     v = p.resources[k]
@@ -237,19 +237,19 @@ async def pinfo(ctx):
                 output += "```"
                 await ctx.send(output)
             else:
-                await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=30.0)
+                await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=15.0)
     await ctx.message.delete()
-    await pname.delete()
-    await pview.delete()
+    await project_name.delete()
+    await project_ask.delete()
 @bot.command()
 async def finishProject(ctx):
-    pview = await ctx.send("What project are you completing?")
-    pname = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    project_ask = await ctx.send("What project are you completing?")
+    project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     if project_list == []:
         await ctx.send("There are no active projects right now!", delete_afte=30.0)
     else:
         for p in project_list:
-            if p.name.lower() == pname.content.lower():
+            if p.name.lower() == project_name.content.lower():
                 output1 = p.completeProject()
                 output2 = p.getContributions()
                 await ctx.send(output1)
@@ -257,8 +257,8 @@ async def finishProject(ctx):
                 project_list.remove(p)
             else:
                 await ctx.send("Sorry, there is no project under that name. Use the projects command to see the list!", delete_after=30.0)
-    await pview.delete()
-    await pname.delete()
+    await project_ask.delete()
+    await project_name.delete()
     await ctx.delete()
 
 with open('secrets', 'r') as sf:
