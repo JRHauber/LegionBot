@@ -42,12 +42,12 @@ profession_roles = {
     'forestry': 1267585920773918752
 }
        
-
+def findProject(name):
+    return next((i for i in project_list if i.name.lower() == name.lower()), -1)
 
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
-
 
 @bot.command()
 async def setup(ctx):
@@ -136,13 +136,14 @@ async def newProject(ctx):
     maxTime = time.time() + 60
     bot_message = await ctx.send("Creating a new project: What's the project's name?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    for p in project_list:
-        if p.name.lower() == project_name.content.lower():
-            await ctx.send("Sorry that name is in use. Please pick another!", delete_after=10.0)
-            await bot_message.delete()
-            await project_name.delete()
-            return
-    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
+    
+    if findProject(project_name.content.lower()) != -1:
+        await ctx.send("Sorry that name is in use. Please pick another!", delete_after=10.0)
+        await bot_message.delete()
+        await project_name.delete()
+        return
+    
+    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")    
     resources = {}
     doLoop = True
     while doLoop:
@@ -152,15 +153,18 @@ async def newProject(ctx):
             await project_name.delete()
             await bot_confirm.delete()
             return
+        
         resource_ask = await ctx.send("What's the name of the resource?")
         resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         await resource_name.delete()
         await resource_ask.delete()
+        
         resource_ask = await ctx.send("How many of that resource do you need?")
         resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         await resource_count.delete()
         await resource_ask.delete()
         resources[resource_name.content.lower()] = int(resource_count.content)
+        
         resource_ask = await ctx.send("Are you done adding resources?")
         resource_ans = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         if resource_ans.content.lower() == "done":
@@ -169,11 +173,13 @@ async def newProject(ctx):
         else:
             await resource_ask.delete()
             await resource_ans.delete()
+            
     temp = Project(project_name.content.lower(), resources)
     print(temp.resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
     await ctx.send("Your project has been created!", delete_after=10.0)
+    
     await bot_message.delete()
     await ctx.message.delete()
     await resource_ans.delete()
@@ -185,39 +191,40 @@ async def newProject(ctx):
 async def contribute(ctx):
     bot_message = await ctx.send("What project did you contribute to?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    for p in project_list:
-        if p.name.lower() == project_name.content.lower():
-            currentProject = p
-            await project_name.delete()
-        else:
-            await ctx.send("Sorry, I don't see a project under that name! Use the `projects` command to see a list of active projects!", delete_after=15.0)
-            await bot_message.delete()
-            await project_name.delete()
-            return
+    current_project = findProject(project_name.content.lower())
+    
+    if current_project == -1:
+        await ctx.send("Sorry, I don't see a project under that name! Use the `projects` command to see a list of active projects!", delete_after=10.0)
+        await bot_message.delete()
+        await project_name.delete()
+        return
+    await project_name.delete()
+          
     output = '```'
-    output += f'\nProject: {currentProject.name.title()}'
-    for k in currentProject.resources:
-        v = currentProject.resources[k]
-        for i in currentProject.maxResources:
-            j = currentProject.maxResources[i]
-            if i == k:
-                output += f"\n{i}: {v}/{j}"
-            output += "```"
+    output += f'\nProject: {current_project.name.title()}'
+    for k in current_project.resources:
+        v = current_project.resources[k]
+        w = current_project.maxResources[k]
+        output += f"\n{k}: {v}/{w}"
+    output += "```"
     await ctx.send(output)
+    
     resource_ask = await ctx.send("What resource did you contribute?")
     resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    if not resource_name.content.lower() in currentProject.resources:
+    if not resource_name.content.lower() in current_project.resources:
         await ctx.send("That resource isn't a part of this project, check pinfo and try again", delete_after=10.0)
         await bot_message.delete()
         return
     await resource_ask.delete()
+    
     count_ask = await ctx.send("How many of that resource did you add?")
     resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     await count_ask.delete()
-    if currentProject.addContribution(ctx.author.display_name.lower(), resource_name.content.lower(), int(resource_count.content)) == -1:
-        await ctx.send("Sorry it doesn't look like that resource is in that project. Use the pinfo command to double check you named it right!", delete_after=30.0)
-    else:
-        await ctx.send("Added your contribution! Thank you for contributing!", delete_after=30.0)
+    if current_project.addContribution(ctx.author.display_name.lower(), resource_name.content.lower(), int(resource_count.content)) == -1:
+        await ctx.send("Sorry it doesn't look like that resource is in that project. Use the pinfo command to double check you named it right!", delete_after=10.0)
+        return
+    await ctx.send("Added your contribution! Thank you for contributing!", delete_after=10.0)
+    
     await ctx.message.delete()
     await bot_message.delete()
     await resource_name.delete()
@@ -229,12 +236,12 @@ async def contribute(ctx):
 async def projects(ctx):
     output = "```"
     if project_list == []:
-        await ctx.send("There are no active projects right now!", delete_after=30.0)
-    else:
-        for p in project_list:
-            output += "\n" + p.name.lower()
-        output += "```"
-        await ctx.send(output)
+        await ctx.send("There are no active projects right now!", delete_after=10.0)
+        return
+    for p in project_list:
+        output += "\n" + p.name.title()
+    output += "```"
+    await ctx.send(output)
     await ctx.message.delete()
 
 @bot.command()
@@ -242,22 +249,22 @@ async def pinfo(ctx):
     project_ask = await ctx.send("What project do you want to view?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     output = "```"
-    if project_list == []:
-        await ctx.send("There are no active projects right now!", delete_after=15.0)
-    else:
-        for p in project_list:
-            if p.name.lower() == project_name.content.lower():
-                output += f'\nProject: {p.name.title()}'
-                for k in p.resources:
-                    v = p.resources[k]
-                    for i in p.maxResources:
-                        j = p.maxResources[i]
-                        if i == k:
-                            output += f"\n{i}: {v}/{j}"
-                output += "```"
-                await ctx.send(output)
-            else:
-                await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=15.0)
+
+    current_project = findProject(project_name.content.lower())
+    if current_project == -1:
+        await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=10.0)
+        return    
+    
+    output += f'\nProject: {current_project.name.title()}'
+    output = '```'
+    output += f'\nProject: {current_project.name.title()}'
+    for k in current_project.resources:
+        v = current_project.resources[k]
+        w = current_project.maxResources[k]
+        output += f"\n{k}: {v}/{w}"
+    output += "```"
+    await ctx.send(output)    
+                
     await ctx.message.delete()
     await project_name.delete()
     await project_ask.delete()
@@ -266,18 +273,18 @@ async def pinfo(ctx):
 async def finishProject(ctx):
     project_ask = await ctx.send("What project are you completing?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    if project_list == []:
-        await ctx.send("There are no active projects right now!", delete_afte=30.0)
-    else:
-        for p in project_list:
-            if p.name.lower() == project_name.content.lower():
-                output1 = p.completeProject()
-                output2 = p.getContributions()
-                await ctx.send(output1)
-                await ctx.send(output2)
-                project_list.remove(p)
-            else:
-                await ctx.send("Sorry, there is no project under that name. Use the projects command to see the list!", delete_after=30.0)
+    
+    current_project = findProject(project_name.content.lower())
+    if current_project == -1:
+        await ctx.send("Sorry, there's no project under that name. Use the projects command to see the list!", delete_after=10.0)
+        return    
+    
+    output1 = current_project.completeProject()
+    output2 = current_project.getContributions()
+    await ctx.send(output1)
+    await ctx.send(output2)
+    project_list.remove(current_project)
+
     await project_ask.delete()
     await project_name.delete()
     await ctx.message.delete()
