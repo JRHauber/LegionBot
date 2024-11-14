@@ -152,34 +152,27 @@ async def newProject(ctx):
             await bot_confirm.delete()
             return
 
-        resource_ask = await ctx.send("What's the name of the resource?")
-        resource_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-        await resource_name.delete()
-        await resource_ask.delete()
-        
-        resource_ask = await ctx.send("How many of that resource do you need?")
-        resource_count = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-        await resource_count.delete()
-        await resource_ask.delete()
-        resources[resource_name.content.lower()] = int(resource_count.content)
-        
-        resource_ask = await ctx.send("Are you done adding resources?")
+        resource_ask = await ctx.send("Please type in the next resource in the format name|amount, or type done to finish")
         resource_ans = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
         if resource_ans.content.lower() == "done":
             doLoop = False
             await resource_ask.delete()
-        else:
-            await resource_ask.delete()
             await resource_ans.delete()
-
+            await project_name.delete()
+        elif not '|' in resource_ans.content.lower():
+            await ctx.send("Please make sure you include a | between the name and quantity of the item! Or type done to finish.", delete_after=5.0)
+            maxTime = time.time() + 60
+        else:
+            ans = resource_ans.content.lower().split('|')
+            resources[ans[0].lower()] = int(ans[1])
+            maxTime = time.time() + 60
+        
     temp = Project(project_name.content.lower(), resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
     await ctx.send("Your project has been created!", delete_after=10.0)
 
     await bot_message.delete()
-    await resource_ans.delete()
-    await project_name.delete()
     await bot_confirm.delete()
 
 
@@ -201,7 +194,10 @@ async def contribute(ctx):
     for k in current_project.resources:
         v = current_project.resources[k]
         w = current_project.maxResources[k]
-        output += f"\n{k}: {v}/{w}"
+        if (w - (w-v)) == 0:
+            output += f"\n{k: <16}:           Completed"
+        else:
+            output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
     output += "```"
     await ctx.send(output)
 
@@ -255,7 +251,10 @@ async def pinfo(ctx):
     for k in current_project.resources:
         v = current_project.resources[k]
         w = current_project.maxResources[k]
-        output += f"\n{k}: {v}/{w}"
+        if (w - (w-v)) == 0:
+            output += f"\n{k: <16}:           Completed"
+        else:
+            output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
     output += "```"
     await ctx.send(output)
 
