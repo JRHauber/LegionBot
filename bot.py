@@ -52,6 +52,14 @@ async def on_ready():
     print(f"We have logged in as {bot.user}")
 
 @bot.command()
+async def requestlist(ctx):
+    output = "```"
+    for r in requests_list:
+        output += f"\n {r.requestor_name} - {r.resource} - {r.claimant_name} - {r.id}"
+    output += "```"
+    await ctx.send(output)
+
+@bot.command()
 async def setup(ctx):
     await ctx.send("Test")
 @bot.command()
@@ -178,6 +186,14 @@ async def newProject(ctx):
 
 @bot.command()
 async def contribute(ctx):
+    output = "```"
+    if project_list == []:
+        await ctx.send("There are no active projects right now!", delete_after=10.0)
+        return
+    for p in project_list:
+        output += "\n" + p.name.title()
+    output += "```"
+    await ctx.send(output)
     bot_message = await ctx.send("What project did you contribute to?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
     current_project = findProject(project_name.content.lower())
