@@ -54,8 +54,19 @@ async def on_ready():
 @bot.command()
 async def requestlist(ctx):
     output = "```"
+    namePadding = 0
+    requestPadding = 0
+    claimantPadding = 0
     for r in requests_list:
-        output += f"\n {r.requestor_name} - {r.resource} - {r.claimant_name} - {r.id}"
+        namePadding = max(namePadding, len(r.requestor_name))
+        requestPadding = max(requestPadding, len(r.resource))
+        claimantPadding = max(claimantPadding, len(r.claimant_name))
+    
+    namePadding += 4
+    requestPadding += 4
+    claimantPadding += 4
+    for r in requests_list:
+        output += f"\n {r.requestor_name: <{namePadding}} - {r.resource: <{requestPadding}} - {r.claimant_name: <{claimantPadding}} - {r.id}"
     output += "```"
     await ctx.send(output)
 
