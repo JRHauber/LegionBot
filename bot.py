@@ -58,15 +58,23 @@ async def requestlist(ctx):
     requestPadding = 0
     claimantPadding = 0
     for r in requests_list:
+        
         namePadding = max(namePadding, len(r.requestor_name))
         requestPadding = max(requestPadding, len(r.resource))
         claimantPadding = max(claimantPadding, len(r.claimant_name))
-    
+
     namePadding += 4
     requestPadding += 4
     claimantPadding += 4
+    count = 0
+    
     for r in requests_list:
         output += f"\n {r.requestor_name: <{namePadding}} - {r.resource: <{requestPadding}} - {r.claimant_name: <{claimantPadding}} - {r.id}"
+        count += 1
+        if count % 10 == 0:
+            output += "```"
+            await ctx.send(output)
+            output = "```"
     output += "```"
     await ctx.send(output)
 
