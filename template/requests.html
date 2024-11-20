@@ -1,0 +1,8 @@
+{% for request in requests %}
+<li>
+  {{request.id}}
+  <input name="text" value="{{request.resource}}" hx-put="/requests/{{request.id}}" hx-target="#requests" hx-swap="innerHTML" hx-trigger="keyup[key=='Enter']">
+  <input type="button" value={{request.claimant_name}} hx-post="/requests/{{request.id}}/toggle" hx-target="#requests" hx-swap="innerHTML">
+  <input type="button" value="delete" hx-post="/requests/{{request.id}}/delete" hx-target="#requests" hx-swap="innerHTML">
+</li>
+{% endfor %}

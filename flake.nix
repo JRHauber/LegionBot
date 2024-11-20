@@ -27,8 +27,8 @@
             packages = [
               # Python packages:
               (python.withPackages (p: with p; [
+                uvicorn
                 fastapi
-                requests
                 discordpy
               ]))
             ];

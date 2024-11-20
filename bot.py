@@ -1,10 +1,18 @@
-﻿import discord
+﻿import asyncio
+import discord
 from discord.ext import commands
 from discord.utils import get
 from resource_requests import resourceRequest
 from projects import Project
 import pickle
 import time
+from typing import Annotated, Union
+from fastapi import FastAPI, Form, Header, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from uuid import uuid4
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -58,7 +66,7 @@ async def requestlist(ctx):
     requestPadding = 0
     claimantPadding = 0
     for r in requests_list:
-        
+
         namePadding = max(namePadding, len(r.requestor_name))
         requestPadding = max(requestPadding, len(r.resource))
         claimantPadding = max(claimantPadding, len(r.claimant_name))
@@ -67,7 +75,7 @@ async def requestlist(ctx):
     requestPadding += 4
     claimantPadding += 4
     count = 0
-    
+
     for r in requests_list:
         output += f"\n {r.requestor_name: <{namePadding}} - {r.resource: <{requestPadding}} - {r.claimant_name: <{claimantPadding}} - {r.id}"
         count += 1
@@ -82,7 +90,7 @@ async def requestlist(ctx):
 async def setup(ctx):
     await ctx.send("Test")
 @bot.command()
-async def request(ctx, role= "foraging", *, message="Test Message"):
+async def request(ctx, *, message: str="Test Message"):
         j=1
         if requests_list == []:
             j = 1
@@ -95,7 +103,6 @@ async def request(ctx, role= "foraging", *, message="Test Message"):
         id = j
 
         sent = await ctx.send(f"""
-                {get(ctx.guild.roles, id=profession_roles[role.lower()]).mention}
                 Requester: {ctx.author.mention}
                 Message: {message}
                 ID: {id}
@@ -110,14 +117,14 @@ async def claim(ctx, id= -1):
     if currentRequest == -1:
         await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
         return
-    
+
     await ctx.send(f"""
                     {currentRequest.requestor_mention}
                     Claimant: {ctx.author.display_name.capitalize()}
                     Resource: {currentRequest.resource}
                     ID: {currentRequest.id}
                     """)
-    
+
     currentRequest.claimant_name = ctx.author.display_name
     currentRequest.claimant_id = ctx.author.id
     currentRequest.claimant_mention = ctx.author.mention
@@ -129,14 +136,14 @@ async def complete(ctx, id=-1):
     if currentRequest == -1:
         await ctx.send("Please enter a proper ID!", delete_after=10.0)
         return
-    
+
     await ctx.send(f"""
                         {currentRequest.requestor_mention}
                         Completer: {ctx.author.display_name.capitalize()}
                         Resource: {currentRequest.resource}
                         ID: {currentRequest.id}
                         """)
-    
+
     requests_list.remove(currentRequest)
     pickle.dump( requests_list, open("requests.p", "wb"))
 
@@ -161,14 +168,14 @@ async def newProject(ctx):
     maxTime = time.time() + 60
     bot_message = await ctx.send("Creating a new project: What's the project's name?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    
+
     if findProject(project_name.content.lower()) != -1:
         await ctx.send("Sorry that name is in use. Please pick another!", delete_after=10.0)
         await bot_message.delete()
         await project_name.delete()
         return
 
-    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")    
+    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
     resources = {}
     doLoop = True
     while doLoop:
@@ -193,7 +200,7 @@ async def newProject(ctx):
             ans = resource_ans.content.lower().split('|')
             resources[ans[0].lower()] = int(ans[1])
             maxTime = time.time() + 60
-        
+
     temp = Project(project_name.content.lower(), resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
@@ -316,7 +323,78 @@ async def finishProject(ctx):
     await project_name.delete()
     pickle.dump( project_list, open("project_list.p", "wb"))
 
-with open('secrets', 'r') as sf:
-    token = sf.readline().strip()
+### web
+app = FastAPI()
+templates = Jinja2Templates(directory="template")
 
-bot.run(token)
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
+
+@app.get("/requests", response_class=HTMLResponse)
+async def list_requests(request: Request, hx_request: Annotated[Union[str, None], Header()] = None):
+    if hx_request:
+        return templates.TemplateResponse(
+            request=request, name="requests.html", context={"requests": requests_list}
+        )
+    return JSONResponse(content=jsonable_encoder(requests_list))
+
+@app.post("/requests", response_class=HTMLResponse)
+async def create_request(requesta: Request, message: Annotated[str, Form()]):
+    j=1
+    if requests_list == []:
+        j = 1
+    else:
+        while True:
+            if findRequest(j) == -1:
+                break
+            else:
+                j += 1
+    id = j
+    r = resourceRequest(int(id), "system", 0, 0, 'Unclaimed', '', 0, message)
+    requests_list.append(r)
+    pickle.dump( requests_list, open("requests.p", "wb"))
+    return templates.TemplateResponse(
+        request=requesta, name="requests.html", context={"requests": requests_list}
+    )
+
+@app.put("/requests/{request_id}", response_class=HTMLResponse)
+async def update_request(requesta: Request, request_id: str, text: Annotated[str, Form()]):
+    for request in requests_list:
+        if str(request.id) == request_id:
+            request.resource = text
+            break
+    return templates.TemplateResponse(
+        request=requesta, name="requests.html", context={"requests": requests_list}
+    )
+
+@app.post("/requests/{request_id}/toggle", response_class=HTMLResponse)
+async def toggle_request(requesta: Request, request_id: str):
+    for request in requests_list:
+        if str(request.id) == request_id:
+            if request.claimant_name != "Unclaimed":
+                request.claimant_name = "Unclaimed"
+            else:
+                request.claimant_name = "system"
+            break
+    pickle.dump( requests_list, open("requests.p", "wb"))
+    return templates.TemplateResponse(
+        request=requesta, name="requests.html", context={"requests": requests_list}
+    )
+
+@app.post("/requests/{request_id}/delete", response_class=HTMLResponse)
+async def delete_todo(requesta: Request, request_id: str):
+    for index, request in enumerate(requests_list):
+        if str(request.id) == request_id:
+            del requests_list[index]
+            break
+    pickle.dump( requests_list, open("requests.p", "wb"))
+    return templates.TemplateResponse(
+        request=requesta, name="requests.html", context={"requests": requests_list}
+    )
+
+@app.on_event("startup")
+async def startup_event():
+    with open('secrets', 'r') as sf:
+        token = sf.readline().strip()
+    asyncio.create_task(bot.start(token))
