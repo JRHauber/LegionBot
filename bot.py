@@ -132,8 +132,8 @@ async def unclaim(ctx, id = -1):
     
     if currentRequest.claimant_id == ctx.author.id:
         currentRequest.claimant_name = "Unclaimed"
-        currentRequest.claimant_id = -1
-        currentRequest.claimant_mention = 0
+        currentRequest.claimant_id = 0
+        currentRequest.claimant_mention = ''
         await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
     else:
         await ctx.send("You didn't claim that request silly! Double check your $claims!")
