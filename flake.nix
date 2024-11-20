@@ -27,6 +27,7 @@
             packages = [
               # Python packages:
               (python.withPackages (p: with p; [
+                fastapi
                 requests
                 discordpy
               ]))
