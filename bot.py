@@ -26,21 +26,7 @@ except FileNotFoundError:
 
 
 # create in promise on init
-profession_roles = {
-    'foraging': 1267585190981796021,
-    'hunting': 1267585359986823168,
-    'mining': 1267585386859728927,
-    'carpentry': 1267585436885323817,
-    'cooking': 1267585479616893052,
-    'leatherworking': 1267585503385882665,
-    'masonry': 1267585535858315306,
-    'smithing': 1267585569442238556,
-    'tailoring': 1267585594750402581,
-    'scholar': 1267585753496551627,
-    'farming': 1267585784404377763,
-    'fishing': 1267585808186081311,
-    'forestry': 1267585920773918752
-}
+
 
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
@@ -82,7 +68,7 @@ async def requestlist(ctx):
 async def setup(ctx):
     await ctx.send("Test")
 @bot.command()
-async def request(ctx, role= "foraging", *, message="Test Message"):
+async def request(ctx, *, message="Test Message"):
         j=1
         if requests_list == []:
             j = 1
@@ -95,7 +81,6 @@ async def request(ctx, role= "foraging", *, message="Test Message"):
         id = j
 
         sent = await ctx.send(f"""
-                {get(ctx.guild.roles, id=profession_roles[role.lower()]).mention}
                 Requester: {ctx.author.mention}
                 Message: {message}
                 ID: {id}
