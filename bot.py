@@ -124,6 +124,22 @@ async def claim(ctx, id= -1):
     pickle.dump( requests_list, open("requests.p", "wb"))
 
 @bot.command()
+async def unclaim(ctx, id = -1):
+    currentRequest = findRequest(id)
+    if currentRequest == -1:
+        await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
+        return
+    
+    if currentRequest.claimant_id == ctx.author.id:
+        currentRequest.claimant_name = "Unclaimed"
+        currentRequest.claimant_id = -1
+        currentRequest.claimant_mention = 0
+        await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
+    else:
+        await ctx.send("You didn't claim that request silly! Double check your $claims!")
+    pickle.dump( requests_list, open("requests.p", "wb"))
+    
+@bot.command()
 async def complete(ctx, id=-1):
     currentRequest = findRequest(id)
     if currentRequest == -1:
