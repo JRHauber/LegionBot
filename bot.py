@@ -34,21 +34,7 @@ except FileNotFoundError:
 
 
 # create in promise on init
-profession_roles = {
-    'foraging': 1267585190981796021,
-    'hunting': 1267585359986823168,
-    'mining': 1267585386859728927,
-    'carpentry': 1267585436885323817,
-    'cooking': 1267585479616893052,
-    'leatherworking': 1267585503385882665,
-    'masonry': 1267585535858315306,
-    'smithing': 1267585569442238556,
-    'tailoring': 1267585594750402581,
-    'scholar': 1267585753496551627,
-    'farming': 1267585784404377763,
-    'fishing': 1267585808186081311,
-    'forestry': 1267585920773918752
-}
+
 
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
@@ -128,6 +114,22 @@ async def claim(ctx, id= -1):
     currentRequest.claimant_name = ctx.author.display_name
     currentRequest.claimant_id = ctx.author.id
     currentRequest.claimant_mention = ctx.author.mention
+    pickle.dump( requests_list, open("requests.p", "wb"))
+
+@bot.command()
+async def unclaim(ctx, id = -1):
+    currentRequest = findRequest(id)
+    if currentRequest == -1:
+        await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
+        return
+
+    if currentRequest.claimant_id == ctx.author.id:
+        currentRequest.claimant_name = "Unclaimed"
+        currentRequest.claimant_id = 0
+        currentRequest.claimant_mention = ''
+        await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
+    else:
+        await ctx.send("You didn't claim that request silly! Double check your $claims!")
     pickle.dump( requests_list, open("requests.p", "wb"))
 
 @bot.command()
