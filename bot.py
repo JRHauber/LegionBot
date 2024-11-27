@@ -55,6 +55,8 @@ async def requestlist(ctx):
     count = 0
     
     for r in requests_list:
+        if (hasattr(r, 'completed')) and (r.completed == True):
+            continue
         output += f"\n {r.requestor_name: <{namePadding}} - {r.resource: <{requestPadding}} - {r.claimant_name: <{claimantPadding}} - {r.id}"
         count += 1
         if count % 10 == 0:
@@ -85,7 +87,7 @@ async def request(ctx, *, message="Test Message"):
                 Message: {message}
                 ID: {id}
                 """)
-        r = resourceRequest(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message)
+        r = resourceRequest(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message, False)
         requests_list.append(r)
         pickle.dump( requests_list, open("requests.p", "wb"))
 
@@ -137,15 +139,17 @@ async def complete(ctx, id=-1):
                         Resource: {currentRequest.resource}
                         ID: {currentRequest.id}
                         """)
-    
-    requests_list.remove(currentRequest)
+    if hasattr(currentRequest, 'completed'):
+        currentRequest.completed = True
+    else:
+        requests_list.remove(currentRequest)
     pickle.dump( requests_list, open("requests.p", "wb"))
 
 @bot.command()
 async def claims(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].claimant_id == ctx.author.id:
+        if requests_list[i].claimant_id == ctx.author.id and (hasattr(requests_list[i], 'completed') and requests_list[i].completed == False):
             out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
 
@@ -153,7 +157,7 @@ async def claims(ctx):
 async def requests(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].requestor_id == ctx.author.id:
+        if requests_list[i].requestor_id == ctx.author.id and (hasattr(requests_list[i], 'completed') and requests_list[i].completed == False):
             out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
 
