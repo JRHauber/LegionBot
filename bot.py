@@ -149,16 +149,22 @@ async def complete(ctx, id=-1):
 async def claims(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].claimant_id == ctx.author.id and (hasattr(requests_list[i], 'completed') and requests_list[i].completed == False):
-            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
+        if requests_list[i].claimant_id == ctx.author.id:
+            if hasattr(requests_list[i], 'completed') and requests_list[i].completed == True:
+                out = out
+            else:
+                out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
 
 @bot.command()
 async def requests(ctx):
     out = ''
     for i in range(len(requests_list)):
-        if requests_list[i].requestor_id == ctx.author.id and (hasattr(requests_list[i], 'completed') and requests_list[i].completed == False):
-            out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
+        if requests_list[i].requestor_id == ctx.author.id:
+            if hasattr(requests_list[i], 'completed') and requests_list[i].completed == True:
+                out = out
+            else:
+                out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
 
 @bot.command()
