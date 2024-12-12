@@ -235,15 +235,21 @@ async def contribute(ctx):
         return
     await project_name.delete()
 
-    output = '```'
-    output += f'\nProject: {current_project.name.title()}'
+    count = 0
+    output = "```"
     for k in current_project.resources:
         v = current_project.resources[k]
         w = current_project.maxResources[k]
         if (w - (w-v)) == 0:
             output += f"\n{k: <16}:           Completed"
+            count += 1
         else:
             output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
+            count += 1
+        if count % 25 == 0:
+            output += "```"            
+            await ctx.send(output)
+            output = "```"
     output += "```"
     await ctx.send(output)
 
@@ -294,13 +300,21 @@ async def pinfo(ctx):
     output += f'\nProject: {current_project.name.title()}'
     output = '```'
     output += f'\nProject: {current_project.name.title()}'
+    count = 0
+    
     for k in current_project.resources:
         v = current_project.resources[k]
         w = current_project.maxResources[k]
         if (w - (w-v)) == 0:
             output += f"\n{k: <16}:           Completed"
+            count += 1
         else:
             output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
+            count += 1
+        if count % 25 == 0:
+            output += "```"            
+            await ctx.send(output)
+            output = "```"
     output += "```"
     await ctx.send(output)
 
