@@ -8,6 +8,7 @@ import time
 import database_sqlite
 
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix = '$', intents=intents)
@@ -24,8 +25,6 @@ db.setup_db()
 
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
-def findRequest(id):
-    return next((i for i in requests_list if i.id == id), -1)
 
 @bot.event
 async def on_ready():
@@ -54,6 +53,7 @@ async def requestlist(ctx):
     requestPadding += 4
     claimantPadding += 4
     count = 0
+
     for r in data:
         if r.claimant_id == None:
             claim_name = "Unclaimed"
