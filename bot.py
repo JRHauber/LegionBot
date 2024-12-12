@@ -46,7 +46,7 @@ async def requestlist(ctx):
     requestPadding = 0
     claimantPadding = 0
 
-    data = await db.get_requests()
+    data = await db.get_requests(int(ctx.message.guild.id))
     for r in data:
         if r.claimant_id == None:
             claim_name = "Unclaimed"

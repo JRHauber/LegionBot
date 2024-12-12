@@ -14,14 +14,14 @@ class Database():
     async def finish_request(self, id : int, server_id : int, claimant_id : int):
         raise NotImplementedError()
 
-    async def get_requests(self):
+    async def get_requests(self, server_id : int):
         raise NotImplementedError()
-    
+
     async def unclaim_request(self, id: int, server_id : int, claimant_id : int):
         raise NotImplementedError()
-    
+
     async def get_claims(self, server_id : int, uid : int):
         raise NotImplementedError()
-    
+
     async def get_user_requests(self, uid : int, server_id : int):
         raise NotImplementedError()

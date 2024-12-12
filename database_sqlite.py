@@ -58,7 +58,7 @@ class DatabaseSqlite(database.Database):
             res = cursor.execute(f"""
                 UPDATE requests
                 SET claimant_id = {claimant_id}
-                WHERE id = {id} AND server_id = {server_id} AND claimant_id IS NULL
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id IS NULL AND not filled
                 RETURNING *;
                 """
             )
@@ -78,7 +78,7 @@ class DatabaseSqlite(database.Database):
             res = cursor.execute(f"""
                 UPDATE requests
                 SET filled = {claimant_id}
-                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id}
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id} AND not filled
                 RETURNING *;
                 """
             )
@@ -96,7 +96,7 @@ class DatabaseSqlite(database.Database):
             res = cursor.execute(f"""
                 UPDATE requests
                 SET claimant_id = NULL
-                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id}
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id} AND not filled
                 RETURNING *;
             """)
             data = res.fetchone()
@@ -112,7 +112,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT * FROM REQUESTS
-                WHERE server_id = {server_id} AND claimant_id = {uid}
+                WHERE server_id = {server_id} AND claimant_id = {uid} AND not filled
             """)
             data = res.fetchall()
             cursor.close()
@@ -126,7 +126,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT * FROM REQUESTS
-                WHERE server_id = {server_id} AND requestor_id = {uid}
+                WHERE server_id = {server_id} AND requestor_id = {uid} AND not filled
             """)
             data = res.fetchall()
             cursor.close()
@@ -135,11 +135,14 @@ class DatabaseSqlite(database.Database):
         return list(map(convertTuple, data))
 
     # dont use this
-    async def get_requests(self):
+    async def get_requests(self, server_id : int):
         await self.lock.acquire()
         try:
             cursor = self.db.cursor()
-            res = cursor.execute("SELECT * FROM REQUESTS WHERE not filled;")
+            res = cursor.execute(f"""
+                SELECT * FROM REQUESTS
+                WHERE not filled AND server_id = {server_id};
+            """)
             data = res.fetchall()
             cursor.close()
         finally:
