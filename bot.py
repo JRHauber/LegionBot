@@ -13,14 +13,6 @@ intents.message_content = True
 bot = commands.Bot(command_prefix = '$', intents=intents)
 
 try:
-    requests_list = pickle.load(open("requests.p", "rb"))
-except FileNotFoundError:
-    requests_list = []
-try:
-    server_list = pickle.load(open("servers.p", "rb"))
-except FileNotFoundError:
-    server_list = []
-try:
     project_list = pickle.load(open("project_list.p", "rb"))
 except FileNotFoundError:
     project_list = []
