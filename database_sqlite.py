@@ -2,6 +2,7 @@ import database
 import sqlite3
 import asyncio
 import re
+import resource_requests
 
 class DatabaseSqlite(database.Database):
     db = None
@@ -24,23 +25,23 @@ class DatabaseSqlite(database.Database):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 server_id INTEGER NOT NULL,
                 filled BOOL NOT NULL,
-                requester_id INTEGER NOT NULL,
+                requestor_id INTEGER NOT NULL,
                 claimant_id INTEGER,
-                resource_message TEXT NOT NULL
+                resource_message VARCHAR(20) NOT NULL
             );
             """
         )
 
-    async def insert_request(self, server_id : int, requester_id : int, resource_message : str) -> int:
+    async def insert_request(self, server_id : int, requestor_id : int, resource_message : str) -> int:
         await self.lock.acquire()
         try:
             cursor = self.db.cursor()
             sanitary_message = re.sub(r'[^a-zA-Z0-9 ]+', '', resource_message)
             res = cursor.execute(f"""
                 INSERT INTO requests
-                (server_id, requester_id, resource_message, filled)
-                VALUES ({server_id}, {requester_id}, "{sanitary_message}", FALSE)
-                RETURNING *;
+                (server_id, requestor_id, resource_message, filled)
+                VALUES ({server_id}, {requestor_id}, "{sanitary_message}", FALSE)
+                RETURNING id;
                 """
             )
             data = res.fetchone()
@@ -48,7 +49,7 @@ class DatabaseSqlite(database.Database):
             cursor.close()
         finally:
             self.lock.release()
-        return data
+        return data[0]
 
     async def claim_request(self, id : int, server_id : int, claimant_id : int):
         await self.lock.acquire()
@@ -64,9 +65,11 @@ class DatabaseSqlite(database.Database):
             data = res.fetchone()
             self.db.commit()
             cursor.close()
+        except Exception as e:
+            print(e)
         finally:
             self.lock.release()
-        return data
+        return convertTuple(data)
 
     async def finish_request(self, id : int, server_id : int, claimant_id : int):
         await self.lock.acquire()
@@ -84,19 +87,64 @@ class DatabaseSqlite(database.Database):
             cursor.close()
         finally:
             self.lock.release()
-        return data
+        return convertTuple(data)
+
+    async def unclaim_request(self, id : int, server_id : int, claimant_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                UPDATE requests
+                SET claimant_id = NULL
+                WHERE id = {id} AND server_id = {server_id} AND claimant_id = {claimant_id}
+                RETURNING *;
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return convertTuple(data)
+
+    async def get_claims(self, server_id : int, uid : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                SELECT * FROM REQUESTS
+                WHERE server_id = {server_id} AND claimant_id = {uid}
+            """)
+            data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return list(map(convertTuple, data))
+
+    async def get_user_requests(self, server_id : int, uid : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                SELECT * FROM REQUESTS
+                WHERE server_id = {server_id} AND requestor_id = {uid}
+            """)
+            data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return list(map(convertTuple, data))
 
     # dont use this
     async def get_requests(self):
         await self.lock.acquire()
         try:
             cursor = self.db.cursor()
-            res = cursor.execute("SELECT * FROM REQUESTS;")
+            res = cursor.execute("SELECT * FROM REQUESTS WHERE not filled;")
             data = res.fetchall()
             cursor.close()
         finally:
             self.lock.release()
-        return data
+        return list(map(convertTuple, data))
 
     async def insert_project(self):
         pass
@@ -110,6 +158,12 @@ class DatabaseSqlite(database.Database):
             self.db.execute("DELETE FROM requests WHERE 1;")
         finally:
             self.lock.release()
+
+def convertTuple(args):
+    if args != None:
+        return resource_requests.resourceRequest(*args)
+    else:
+        return None
 
 
 async def __test_insert(db : DatabaseSqlite):

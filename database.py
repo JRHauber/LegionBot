@@ -20,5 +20,8 @@ class Database():
     async def unclaim_request(self, id: int, server_id : int, claimant_id : int):
         raise NotImplementedError()
     
-    async def get_claims(self, server_id : int, claimant_id : int):
+    async def get_claims(self, server_id : int, uid : int):
+        raise NotImplementedError()
+    
+    async def get_user_requests(self, uid : int, server_id : int):
         raise NotImplementedError()

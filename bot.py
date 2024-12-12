@@ -5,6 +5,7 @@ from resource_requests import resourceRequest
 from projects import Project
 import pickle
 import time
+import database_sqlite
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -24,9 +25,10 @@ try:
 except FileNotFoundError:
     project_list = []
 
+db = database_sqlite.DatabaseSqlite()
+db.setup_db()
 
 # create in promise on init
-
 
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
@@ -43,22 +45,37 @@ async def requestlist(ctx):
     namePadding = 0
     requestPadding = 0
     claimantPadding = 0
-    for r in requests_list:
-        
-        namePadding = max(namePadding, len(r.requestor_name))
-        requestPadding = max(requestPadding, len(r.resource))
-        claimantPadding = max(claimantPadding, len(r.claimant_name))
+
+    data = await db.get_requests()
+    for r in data:
+        if r.claimant_id == None:
+            claim_name = "Unclaimed"
+        else:
+            claim_name = ctx.message.guild.get_member(int(r.claimant_id)).display_name
+        user_name = ctx.message.guild.get_member(int(r.requestor_id)).display_name
+        resource = r.resource[0:40]
+        namePadding = max(namePadding, len(user_name))
+        requestPadding = max(requestPadding, len(resource))
+        claimantPadding = max(claimantPadding, len(claim_name))
 
     namePadding += 4
     requestPadding += 4
     claimantPadding += 4
     count = 0
-    
-    for r in requests_list:
-        if (hasattr(r, 'completed')) and (r.completed == True):
-            continue
-        output += f"\n {r.requestor_name: <{namePadding}} - {r.resource: <{requestPadding}} - {r.claimant_name: <{claimantPadding}} - {r.id}"
+    for r in data:
+        if r.claimant_id == None:
+            claim_name = "Unclaimed"
+        else:
+            claim_name = ctx.message.guild.get_member(int(r.claimant_id)).display_name
+        if len(r.resource) > 40:
+            resource = r.resource[0:40]
+            resource += "..."
+        else:
+            resource = r.resource
+        user_name = ctx.message.guild.get_member(int(r.requestor_id)).display_name
+        output += f"\n {user_name: <{namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
         count += 1
+
         if count % 10 == 0:
             output += "```"
             await ctx.send(output)
@@ -69,102 +86,68 @@ async def requestlist(ctx):
 @bot.command()
 async def setup(ctx):
     await ctx.send("Test")
+
 @bot.command()
 async def request(ctx, *, message="Test Message"):
-        j=1
-        if requests_list == []:
-            j = 1
-        else:
-            while True:
-                if findRequest(j) == -1:
-                    break
-                else:
-                    j += 1
-        id = j
-
-        sent = await ctx.send(f"""
-                Requester: {ctx.author.mention}
-                Message: {message}
-                ID: {id}
-                """)
-        r = resourceRequest(int(id), ctx.author.display_name, ctx.author.mention, ctx.author.id, 'Unclaimed', '', 0, message, False)
-        requests_list.append(r)
-        pickle.dump( requests_list, open("requests.p", "wb"))
+    id = await db.insert_request(ctx.message.guild.id, int(ctx.author.id), message)
+    await ctx.send(f"""
+        Requester: {ctx.author.mention}
+        Message: {message}
+        ID: {id}
+        """)
 
 @bot.command()
 async def claim(ctx, id= -1):
-    currentRequest = findRequest(id)
-    if currentRequest == -1:
+    currentRequest = await db.claim_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
+    if currentRequest == None:
         await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
         return
-    
+
     await ctx.send(f"""
-                    {currentRequest.requestor_mention}
-                    Claimant: {ctx.author.display_name.capitalize()}
-                    Resource: {currentRequest.resource}
-                    ID: {currentRequest.id}
-                    """)
-    
-    currentRequest.claimant_name = ctx.author.display_name
-    currentRequest.claimant_id = ctx.author.id
-    currentRequest.claimant_mention = ctx.author.mention
-    pickle.dump( requests_list, open("requests.p", "wb"))
+    <@{currentRequest.requestor_id}>
+        Claimant: {ctx.author.display_name.capitalize()}
+        Resource: {currentRequest.resource}
+        ID: {currentRequest.id}
+        """)
 
 @bot.command()
 async def unclaim(ctx, id = -1):
-    currentRequest = findRequest(id)
-    if currentRequest == -1:
+    currentRequest = await db.unclaim_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
+    if currentRequest == None:
         await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
         return
-    
-    if currentRequest.claimant_id == ctx.author.id:
-        currentRequest.claimant_name = "Unclaimed"
-        currentRequest.claimant_id = 0
-        currentRequest.claimant_mention = ''
-        await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
-    else:
-        await ctx.send("You didn't claim that request silly! Double check your $claims!")
-    pickle.dump( requests_list, open("requests.p", "wb"))
-    
+    await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
+
 @bot.command()
 async def complete(ctx, id=-1):
-    currentRequest = findRequest(id)
-    if currentRequest == -1:
+    currentRequest = await db.finish_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
+    if currentRequest == None:
         await ctx.send("Please enter a proper ID!", delete_after=10.0)
         return
-    
+
     await ctx.send(f"""
-                        {currentRequest.requestor_mention}
-                        Completer: {ctx.author.display_name.capitalize()}
-                        Resource: {currentRequest.resource}
-                        ID: {currentRequest.id}
-                        """)
-    if hasattr(currentRequest, 'completed'):
-        currentRequest.completed = True
-    else:
-        requests_list.remove(currentRequest)
-    pickle.dump( requests_list, open("requests.p", "wb"))
+        <@{currentRequest.requestor_id}>
+        Completer: {ctx.author.display_name.capitalize()}
+        Resource: {currentRequest.resource}
+        ID: {currentRequest.id}
+    """)
 
 @bot.command()
 async def claims(ctx):
+    data = await db.get_claims(int(ctx.message.guild.id), int(ctx.author.id))
     out = ''
-    for i in range(len(requests_list)):
-        if requests_list[i].claimant_id == ctx.author.id:
-            if hasattr(requests_list[i], 'completed') and requests_list[i].completed == True:
-                out = out
-            else:
-                out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].requestor_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
+    for d in data:
+        user_name = ctx.message.guild.get_member(int(d.requestor_id)).display_name
+        out += ' ' + str(d.id) + ' - ' + user_name.capitalize() + ' - ' + d.resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
 
 @bot.command()
 async def requests(ctx):
+    data = await db.get_user_requests(int(ctx.message.guild.id), int(ctx.author.id))
     out = ''
-    for i in range(len(requests_list)):
-        if requests_list[i].requestor_id == ctx.author.id:
-            if hasattr(requests_list[i], 'completed') and requests_list[i].completed == True:
-                out = out
-            else:
-                out += ' ' + str(requests_list[i].id) + ' - ' + requests_list[i].claimant_name.capitalize() + ' - ' + requests_list[i].resource + '\n'
+    for d in data:
+        user_name = ctx.message.guild.get_member(int(d.requestor_id)).display_name
+        out += ' ' + str(d.id) + ' - ' + user_name.capitalize() + ' - ' + d.resource + '\n'
     await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
 
 @bot.command()
@@ -172,14 +155,14 @@ async def newProject(ctx):
     maxTime = time.time() + 60
     bot_message = await ctx.send("Creating a new project: What's the project's name?")
     project_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
-    
+
     if findProject(project_name.content.lower()) != -1:
         await ctx.send("Sorry that name is in use. Please pick another!", delete_after=10.0)
         await bot_message.delete()
         await project_name.delete()
         return
 
-    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")    
+    bot_confirm = await ctx.send("Okay, now we'll start adding resources. When you are done adding resources, type done")
     resources = {}
     doLoop = True
     while doLoop:
@@ -204,7 +187,7 @@ async def newProject(ctx):
             ans = resource_ans.content.lower().split('|')
             resources[ans[0].lower()] = int(ans[1])
             maxTime = time.time() + 60
-        
+
     temp = Project(project_name.content.lower(), resources)
     project_list.append(temp)
     pickle.dump( project_list, open("project_list.p", "wb"))
@@ -247,7 +230,7 @@ async def contribute(ctx):
             output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
             count += 1
         if count % 25 == 0:
-            output += "```"            
+            output += "```"
             await ctx.send(output)
             output = "```"
     output += "```"
@@ -301,7 +284,7 @@ async def pinfo(ctx):
     output = '```'
     output += f'\nProject: {current_project.name.title()}'
     count = 0
-    
+
     for k in current_project.resources:
         v = current_project.resources[k]
         w = current_project.maxResources[k]
@@ -312,7 +295,7 @@ async def pinfo(ctx):
             output += f"\n{k: <16}:      {w : >7} total - {w - (w-v): <4} remaining"
             count += 1
         if count % 25 == 0:
-            output += "```"            
+            output += "```"
             await ctx.send(output)
             output = "```"
     output += "```"
