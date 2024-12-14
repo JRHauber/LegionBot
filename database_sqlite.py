@@ -32,6 +32,55 @@ class DatabaseSqlite(database.Database):
             """
         )
 
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS resources (
+                resource_id  INTEGER PRIMARY KEY,
+                project_id INTEGER,
+                name TEXT NOT NULL,
+                total_amount INTEGER NOT NULL,
+                UNIQUE(name, project_id) ON CONFLICT ABORT,
+                FOREIGN KEY(project_id) REFERENCES projects(project_id)
+            );
+            """
+        )
+
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contributors (
+                contributor_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                PRIMARY KEY(contributor_id, project_id),
+                FOREIGN KEY(project_id) REFERENCES projects(project_id)
+            );
+            """
+        )
+
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contributions (
+                resource_id INTEGER,
+                contributor_id INTEGER,
+                amount INTEGER NOT NULL,
+                PRIMARY KEY(resource_id, contributor_id),
+                FOREIGN KEY(resource_id) REFERENCES resoruces(resource_id),
+                FOREIGN KEY(contributor_id) REFERENCES contributors(contributor_id)
+            );
+            """
+        )
+
+        self.db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS projects (
+                project_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                server_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                time INTEGER NOT NULL,
+                completed BOOL NOT NULL
+            );
+            """
+        )
+
     async def insert_request(self, server_id : int, requestor_id : int, resource_message : str) -> int:
         await self.lock.acquire()
         try:
@@ -159,6 +208,170 @@ class DatabaseSqlite(database.Database):
         await self.lock.acquire()
         try:
             self.db.execute("DELETE FROM requests WHERE 1;")
+        finally:
+            self.lock.release()
+
+    async def new_project(self, server_id : int, name : str, time : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                INSERT INTO projects
+                (server_id, name, time, completed)
+                VALUES ({server_id}, '{name}', {time}, FALSE)
+                RETURNING project_id;
+                """
+            )
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data[0]
+
+    async def add_resource(self, resource : str, count : int, pid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                    INSERT INTO resources
+                    (project_id, name, total_amount)
+                    VALUES ({pid}, '{resource}', {count});
+                """)
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+
+    async def remove_resource(self, resource : str, pid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                    DELETE FROM resources
+                    WHERE project_id = {pid} and name = '{resource}';
+                """)
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+
+    async def list_projects(self, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                SELECT name, project_id FROM projects
+                WHERE server_id = {server_id};
+            """)
+            data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def list_contributors(self, pid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                    SELECT DISTINCT contributor_id FROM contributors
+                    WHERE project_id = {pid};
+                """)
+                data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def list_contributions(self, pid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                SELECT contributors.contributor_id, resources.name, contributions.amount
+                FROM projects JOIN contributors ON projects.project_id = contributors.project_id
+                JOIN contributions ON contributors.contributor_id = contributions.contributor_id
+                JOIN resources ON contributions.resource_id = resources.resource_id
+                ORDER BY contributors.contributor_id, resources.name;
+            """)
+                data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def list_resources(self, pid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                SELECT resources.name, COALESCE(SUM(contributions.amount), 0), total_amount
+                FROM projects JOIN resources ON projects.project_id = resources.project_id
+                LEFT JOIN contributions ON resources.resource_id = contributions.resource_id
+                GROUP BY resources.name, resources.resource_id, total_amount
+                ORDER BY resources.name, total_amount;
+            """)
+                data = res.fetchall()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def contribute_resources(self, pid : int, name : str, amount : int, uid : int, server_id : int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            servcheck = cursor.execute(f"""
+                SELECT server_id FROM projects
+                WHERE project_id = {pid}
+            """).fetchone()[0]
+            if servcheck == server_id:
+                res = cursor.execute(f"""
+                    INSERT INTO contributors
+                    (contributor_id, project_id)
+                    VALUES ({uid}, {pid})
+                    ON CONFLICT DO NOTHING;
+                """)
+                rid = cursor.execute(f"""
+                    SELECT resource_id FROM resources WHERE name = '{name}' and project_id = {pid}
+                """).fetchone()[0]
+                res = cursor.execute(f"""
+                    INSERT INTO contributions
+                    (contributor_id, amount, resource_id)
+                    VALUES ({uid}, {amount}, {rid})
+                    ON CONFLICT (contributor_id, resource_id) DO
+                    UPDATE
+                    SET amount = amount + {amount}
+                    WHERE contributor_id = {uid} AND resource_id = {rid};
+                """)
+            self.db.commit()
+            cursor.close()
         finally:
             self.lock.release()
 

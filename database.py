@@ -25,3 +25,27 @@ class Database():
 
     async def get_user_requests(self, uid : int, server_id : int):
         raise NotImplementedError()
+
+    async def new_project(self, server_id : int, name : str, time : int):
+        raise NotImplementedError()
+
+    async def add_resource(self, resource : str, count : int, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def add_resource(self, resourc : str, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def list_projects(self, server_id : int):
+        raise NotImplementedError()
+
+    async def list_contributors(self, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def list_contributions(self, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def list_resources (self, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def contribute_resources (self, pid : int, name : str, amount : int, uid : int, server_id : int):
+        raise NotImplementedError()
