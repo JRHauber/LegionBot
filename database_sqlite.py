@@ -218,7 +218,7 @@ class DatabaseSqlite(database.Database):
             res = cursor.execute(f"""
                 INSERT INTO projects
                 (server_id, name, time, completed)
-                VALUES ({server_id}, '{name}', {time}, FALSE)
+                VALUES ({server_id}, '{sanitize(name)}', {time}, FALSE)
                 RETURNING project_id;
                 """
             )
@@ -241,7 +241,7 @@ class DatabaseSqlite(database.Database):
                 res = cursor.execute(f"""
                     INSERT INTO resources
                     (project_id, name, total_amount)
-                    VALUES ({pid}, '{resource}', {count});
+                    VALUES ({pid}, '{sanitize(resource)}', {count});
                 """)
             self.db.commit()
             cursor.close()
@@ -259,7 +259,7 @@ class DatabaseSqlite(database.Database):
             if servcheck == server_id:
                 res = cursor.execute(f"""
                     DELETE FROM resources
-                    WHERE project_id = {pid} and name = '{resource}';
+                    WHERE project_id = {pid} and name = '{sanitize(resource)}';
                 """)
             self.db.commit()
             cursor.close()
@@ -359,7 +359,7 @@ class DatabaseSqlite(database.Database):
                     ON CONFLICT DO NOTHING;
                 """)
                 rid = cursor.execute(f"""
-                    SELECT resource_id FROM resources WHERE name = '{name}' and project_id = {pid}
+                    SELECT resource_id FROM resources WHERE name = '{sanitize(name)}' and project_id = {pid}
                 """).fetchone()[0]
                 res = cursor.execute(f"""
                     INSERT INTO contributions
@@ -381,6 +381,8 @@ def convertTuple(args):
     else:
         return None
 
+def sanitize(stringy):
+    return re.sub(r'[^a-zA-Z0-9 ]+', '', stringy)
 
 async def __test_insert(db : DatabaseSqlite):
     await db.clear_all()
