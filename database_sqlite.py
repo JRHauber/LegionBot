@@ -85,11 +85,10 @@ class DatabaseSqlite(database.Database):
         await self.lock.acquire()
         try:
             cursor = self.db.cursor()
-            sanitary_message = re.sub(r'[^a-zA-Z0-9 ]+', '', resource_message)
             res = cursor.execute(f"""
                 INSERT INTO requests
                 (server_id, requestor_id, resource_message, filled)
-                VALUES ({server_id}, {requestor_id}, "{sanitary_message}", FALSE)
+                VALUES ({server_id}, {requestor_id}, "{sanitize(resource_message)}", FALSE)
                 RETURNING id;
                 """
             )
