@@ -49,3 +49,6 @@ class Database():
 
     async def contribute_resources (self, pid : int, name : str, amount : int, uid : int, server_id : int):
         raise NotImplementedError()
+
+    async def complete_project(self, pid : int, server_id : int):
+        raise NotImplementedError()

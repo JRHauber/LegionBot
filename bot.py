@@ -229,6 +229,11 @@ async def contribute(ctx, pid : int, amount : int, * , name : str):
     await db.contribute_resources(pid, name, amount, ctx.author.id, int(ctx.message.guild.id))
     await ctx.send(f"Thank you for your contribution! You contributed {amount} - {name} to project: {pid}")
 
+@bot.command()
+async def finishProject(ctx, pid : int):
+    name = await db.complete_project(pid, ctx.message.guild.id)
+    await ctx.send(f"You have marked the project {name} - {pid} as complete!")
+
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
 

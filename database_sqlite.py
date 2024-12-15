@@ -234,7 +234,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid} AND not completed;
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -253,7 +253,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid} AND not completed;
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -271,7 +271,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT name, project_id FROM projects
-                WHERE server_id = {server_id};
+                WHERE server_id = {server_id} AND not completed;
             """)
             data = res.fetchall()
             cursor.close()
@@ -285,7 +285,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid};
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -304,7 +304,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid};
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -326,7 +326,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid};
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -348,7 +348,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             servcheck = cursor.execute(f"""
                 SELECT server_id FROM projects
-                WHERE project_id = {pid}
+                WHERE project_id = {pid} AND not completed;
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
@@ -367,12 +367,29 @@ class DatabaseSqlite(database.Database):
                     ON CONFLICT (contributor_id, resource_id) DO
                     UPDATE
                     SET amount = amount + {amount}
-                    WHERE contributor_id = {uid} AND resource_id = {rid};
+                    WHERE contributor_id = {uid} AND resource_id = {rid} AND not completed;
                 """)
             self.db.commit()
             cursor.close()
         finally:
             self.lock.release()
+
+    async def complete_project(self, pid, server_id):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                UPDATE projects
+                SET completed = TRUE
+                WHERE project_id = {pid} AND server_id = {server_id}
+                RETURNING name;
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data[0]
 
 def convertTuple(args):
     if args != None:
