@@ -150,12 +150,12 @@ async def newProject(ctx, name : str):
         await ctx.send(f"Your project has been created! Your project name is {name} and your project id is {data}")
 
 @bot.command()
-async def addResource(ctx, resource, count, pid):
+async def addResource(ctx, count, pid, *, resource):
     await db.add_resource(resource, int(count), int(pid), int(ctx.message.guild.id))
     await ctx.send(f"Resource added! You added {count} - {resource} to project: {pid}")
 
 @bot.command()
-async def removeResource(ctx, resource, pid):
+async def removeResource(ctx, pid, *, resource):
     await db.remove_resource(resource, int(pid), int(ctx.message.guild.id))
     await ctx.send(f"Resource removed! You removed {resource} from project: {pid}")
 

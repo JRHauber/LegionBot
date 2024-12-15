@@ -27,14 +27,64 @@
 
 ### $requests
 
-	This command shows all of the requests that you have made and that have not been completed yet
+	This command shows all of the requests that you have made and that have not been completed yet.
 
 ### $claims
 
-	This commands shows all of the requests you have claimed and not completed yet
+	This commands shows all of the requests you have claimed and not completed yet.
 
 ### $requestlist
-	
+
 	This shows all uncompleted requests
 
-### There is a method for larger scale projects, but that has not yet been moved over to the new storage system, so is unused for now.
+
+## Project Commands
+
+### These commands handle larger scale, group-oriented projects.
+
+### $newProject <name>
+
+	This command creates a new project with the name set in the command.
+
+### $listProjects
+
+	This command lists all active projects in the server along with their Project IDs.
+	Project IDs are how most commands will access a particular project.
+
+### $addResource <pid> <count> <name>
+
+	This command adds a resource to be completed to a specific project.
+
+	Example: $addResource 1 50 T1 Wood Planks
+
+### $removeResource <pid> <name>
+
+	This command removes a resource from a specific project, in case you add something in error.
+
+	Example: $removeResource 1 T1 Wood Planks
+
+### $getResources <pid>
+
+	This command retrieves the list of resources for a particular project.
+
+### $contribute <pid> <count> <name>
+
+	This command marks you as having added <count> resources to the project.
+
+	Example: $contribute 1 10 T1 Wood Planks
+
+### $getContributors <pid>
+
+	This command returns a list of everyone who has made a contribution to a specific project.
+
+### $getContributions <pid>
+
+	This command returns a list of what contributions each person made to a specific project.
+
+### $finishProject <pid>
+
+	This command marks a project as completed.
+
+	NOTE: Most project commands will not work once a project has been marked as completed, and the project will stop showing up in $listProjects.
+
+	Make sure you are done with the project before using this command.
