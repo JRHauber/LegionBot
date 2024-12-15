@@ -35,7 +35,7 @@
 
 ### $requestlist
 
-	This shows all uncompleted requests
+	This shows all uncompleted requests.
 
 
 ## Project Commands
