@@ -1,7 +1,7 @@
 ﻿import discord
 from discord.ext import commands
 from discord.utils import get
-from resource_requests import resourceRequest
+from discord.ext import tasks
 import pickle
 import time
 import database_sqlite
@@ -17,10 +17,17 @@ try:
 except FileNotFoundError:
     project_list = []
 
+try:
+    votes = pickle.load(open("votes.p", "rb"))
+except FileNotFoundError:
+    votes = []
+
 db = database_sqlite.DatabaseSqlite()
 db.setup_db()
 
 # create in promise on init
+
+LEGION_ID = discord.Object(1267584422253694996)
 
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
@@ -28,6 +35,7 @@ def findProject(name):
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
+    annoy_voxel.start()
 
 @bot.command()
 async def requestlist(ctx):
@@ -236,5 +244,11 @@ async def finishProject(ctx, pid : int):
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
+
+@tasks.loop(minutes=53.0)
+async def annoy_voxel():
+    user = await bot.fetch_user(112376667485323264)
+    if user:
+        await user.send("MAKE TREES NERD")
 
 bot.run(token)
