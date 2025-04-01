@@ -1,0 +1,3 @@
+[submodule "discord_gleam"]
+	path = discord_gleam
+	url = git@github.com:benev0/discord_gleam.git
