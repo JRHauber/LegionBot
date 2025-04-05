@@ -24,7 +24,16 @@ pub fn complete(
         discord_gleam.send_message(
           ctx.bot,
           message.d.channel_id,
-          "unclaimed request " <> int.to_string(req.id),
+          "<@"
+            <> int.to_string(req.requestor_id)
+            <> ">"
+            <> "\nCompleted by: <@"
+            <> message.d.author.id
+            <> ">"
+            <> "\nID: "
+            <> int.to_string(req.id)
+            <> "\n"
+            <> req.resource_message,
           [],
         ),
       )

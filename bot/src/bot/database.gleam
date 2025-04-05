@@ -238,7 +238,7 @@ pub fn get_claims(conn: Connection, server_id: Int, uid: Int) {
 pub fn get_user_requests(conn: Connection, server_id: Int, uid: Int) {
   let sql =
     "SELECT * FROM REQUESTS
-    WHERE server_id = ? AND claimant_id = ? AND not filled;"
+    WHERE server_id = ? AND requestor_id = ? AND not filled;"
 
   let result =
     sqlight.query(

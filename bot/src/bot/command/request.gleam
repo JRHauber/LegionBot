@@ -23,12 +23,10 @@ pub fn request(
       "<@"
         <> message.d.author.id
         <> ">"
-        <> "\nRequester: "
-        <> message.d.author.username
-        <> "\nMessage: "
-        <> content
         <> "\nID: "
-        <> int.to_string(id),
+        <> int.to_string(id)
+        <> "\n"
+        <> content,
       [],
     ),
   )

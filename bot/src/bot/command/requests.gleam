@@ -31,7 +31,7 @@ fn send_messages(
       discord_gleam.send_message(
         ctx.bot,
         channel_id,
-        format_message("", data),
+        format_message("```", data),
         [],
       )
       send_messages(ctx, channel_id, second)

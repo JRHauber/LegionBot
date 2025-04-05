@@ -61,34 +61,48 @@ fn event_handler(ctx: context.Context, packet: event_handler.Packet) {
 
 fn message_handler(ctx: context.Context, message: message.MessagePacket) -> Nil {
   case message.d.content {
-    "!ping" -> {
+    // command prefix here:
+    "!" <> command -> {
+      command_handler(ctx, command, message)
+    }
+    _ -> Nil
+  }
+}
+
+fn command_handler(
+  ctx: context.Context,
+  command: String,
+  message: message.MessagePacket,
+) -> Nil {
+  case command {
+    "ping" -> {
       discord_gleam.send_message(ctx.bot, message.d.channel_id, "Pong!", [])
     }
-    "!request " <> content -> {
+    "request " <> content -> {
       let _ = request.request(ctx, message, content)
       Nil
     }
-    "!requests" -> {
+    "requests" -> {
       let _ = requests.requests(ctx, message)
       Nil
     }
-    "!requestList" -> {
+    "requestList" -> {
       let _ = request_list.request_list(ctx, message)
       Nil
     }
-    "!claim " <> content -> {
+    "claim " <> content -> {
       let _ = claim.claim(ctx, message, content)
       Nil
     }
-    "!unclaim " <> content -> {
+    "unclaim " <> content -> {
       let _ = unclaim.unclaim(ctx, message, content)
       Nil
     }
-    "!claims" -> {
+    "claims" -> {
       let _ = claims.claims(ctx, message)
       Nil
     }
-    "!complete " <> content -> {
+    "complete " <> content -> {
       let _ = complete.complete(ctx, message, content)
       Nil
     }
