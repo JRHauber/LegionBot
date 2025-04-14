@@ -5,6 +5,7 @@ import bot/command/request
 import bot/command/request_list
 import bot/command/requests
 import bot/command/unclaim
+import bot/command/whois
 import bot/context
 import bot/database
 import discord_gleam
@@ -28,7 +29,14 @@ pub fn main() {
   logging.configure()
   logging.set_level(logging.Info)
 
-  let intents = intents.Intents(message_content: True, guild_messages: True)
+  let intents =
+    intents.Intents(
+      ..intents.empty_intents(),
+      message_content: True,
+      guild_messages: True,
+      guild_members: True,
+    )
+
   let bot = discord_gleam.bot(bot_token, bot_id, intents)
 
   use db <- database.with_connection(db_name)
@@ -104,6 +112,10 @@ fn command_handler(
     }
     "complete " <> content -> {
       let _ = complete.complete(ctx, message, content)
+      Nil
+    }
+    "whois " <> content -> {
+      let _ = whois.whois(ctx, message, content)
       Nil
     }
     _ -> Nil

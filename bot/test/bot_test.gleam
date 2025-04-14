@@ -1,4 +1,5 @@
 import gleeunit
+import gleeunit/should
 
 pub fn main() {
   gleeunit.main()
@@ -6,5 +7,5 @@ pub fn main() {
 
 // gleeunit test functions end in `_test`
 pub fn bot_test() {
-  todo
+  should.fail()
 }

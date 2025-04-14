@@ -1,21 +1,44 @@
 import bot/context
 import bot/database
+import bot/helpers
 import discord_gleam
 import discord_gleam/discord/snowflake
 import discord_gleam/ws/packets/message
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/result
 
-fn format_message(acc: String, data: List(database.UserRequest)) -> String {
-  // needs to show who claimed the request
+fn format_message(
+  ctx: context.Context,
+  acc: String,
+  data: List(database.UserRequest),
+) -> String {
   case data {
     [] -> "```\n" <> acc
-    [req, ..data] ->
+    [req, ..data] -> {
+      let username =
+        req.claimant_id
+        |> option.then(fn(id) {
+          id
+          |> int.to_string
+          |> helpers.get_username(ctx.bot, _)
+          |> option.or(option.Some("Unknown User"))
+        })
+        |> option.unwrap("Unclaimed")
+
       format_message(
-        int.to_string(req.id) <> " - " <> req.resource_message <> "\n" <> acc,
+        ctx,
+        int.to_string(req.id)
+          <> " - "
+          <> username
+          <> " - "
+          <> req.resource_message
+          <> "\n"
+          <> acc,
         data,
       )
+    }
   }
 }
 
@@ -31,7 +54,7 @@ fn send_messages(
       discord_gleam.send_message(
         ctx.bot,
         channel_id,
-        format_message("```", data),
+        format_message(ctx, "```", data),
         [],
       )
       send_messages(ctx, channel_id, second)
