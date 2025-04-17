@@ -16,6 +16,7 @@ pub fn with_connection(name: String, f: fn(sqlight.Connection) -> a) -> a {
 
 pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, Nil) {
   sqlight.exec(
+    // rename plural tables to singular
     "
     CREATE TABLE IF NOT EXISTS requests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,37 +27,29 @@ pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, Nil) {
       resource_message VARCHAR(20) NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS resources (
-      resource_id  INTEGER PRIMARY KEY,
-      project_id INTEGER,
-      name TEXT NOT NULL,
-      total_amount INTEGER NOT NULL,
-      UNIQUE(name, project_id) ON CONFLICT ABORT,
-      FOREIGN KEY(project_id) REFERENCES projects(project_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS contributors (
-      contributor_id INTEGER NOT NULL,
-      project_id INTEGER NOT NULL,
-      PRIMARY KEY(contributor_id, project_id),
-      FOREIGN KEY(project_id) REFERENCES projects(project_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS contributions (
-      resource_id INTEGER,
-      contributor_id INTEGER,
-      amount INTEGER NOT NULL,
-      PRIMARY KEY(resource_id, contributor_id),
-      FOREIGN KEY(resource_id) REFERENCES resoruces(resource_id),
-      FOREIGN KEY(contributor_id) REFERENCES contributors(contributor_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS projects (
+    CREATE TABLE IF NOT EXISTS project (
       project_id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       time INTEGER NOT NULL,
       completed BOOL NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS target (
+      target_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      target_amount INTEGER NOT NULL,
+      UNIQUE(name, project_id) ON CONFLICT ABORT,
+      FOREIGN KEY(project_id) REFERENCES projects(project_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS contribution (
+      target_id INTEGER NOT NULL,
+      contributor_id INTEGER,
+      amount INTEGER NOT NULL,
+      PRIMARY KEY(target_id, contributor_id),
+      FOREIGN KEY(target_id) REFERENCES target(target_id),
     );
     ",
     conn,
@@ -65,10 +58,11 @@ pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, Nil) {
 }
 
 // '[^a-zA-Z0-9 ]+' sub out for nothing
-fn sanitize(dirty: String) -> String {
+fn sanitize(dirty: String, length: Int) -> String {
   let assert Ok(re) = regexp.from_string("[^a-zA-Z0-9 ]+")
-  regexp.replace(re, dirty, "")
-  |> string.slice(0, 30)
+  dirty
+  |> string.slice(0, length)
+  |> regexp.replace(re, _, "")
 }
 
 pub type UserRequest {
@@ -110,7 +104,7 @@ pub fn create_request(
   requestor_id: Int,
   resource_message: String,
 ) {
-  let resource_message = sanitize(resource_message)
+  let resource_message = sanitize(resource_message, 30)
   let sql =
     "INSERT INTO requests
     (server_id, requestor_id, resource_message, filled)
@@ -266,4 +260,151 @@ pub fn get_requests(conn: Connection, server_id: Int) {
     Ok(a) -> Ok(a)
     Error(_) -> Error("Sqlite Error")
   }
+}
+
+pub fn new_project(conn: Connection, server_id: Int, name: String, time: Int) {
+  let name = sanitize(name, 30)
+
+  let sql =
+    "INSERT INTO projects
+    (server_id, name, time, completed)
+    VALUES (?, ?, ?, FALSE)
+    RETURNING project_id;"
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.text(name), sqlight.int(time)],
+      decode.int,
+    )
+
+  case result {
+    Ok(id) -> Ok(id)
+    Error(_) -> Error("Sqlite Error")
+  }
+}
+
+pub fn add_target(
+  conn: Connection,
+  target: String,
+  amount: Int,
+  pid: Int,
+  server_id: Int,
+) {
+  let target = sanitize(target, 30)
+  // [tx]
+  // insert and fail due to f-key
+  // add to resources if project not completed
+  let sql =
+    "
+    BEGIN TRANSACTION;
+
+    SELECT
+      CASE WHEN server_id = ?
+        THEN 1
+        ELSE RAISE(ABORT, 'server mismatch')
+        END
+      FROM project JOIN target ON project.project_id = target.project_id
+      WHERE target.project_id = ?;
+
+    INSERT INTO target
+      (project_id, name, target_amount)
+      VALUES (?, ?, ?);
+
+    COMMIT;"
+
+  todo
+}
+
+pub fn remove_target(conn: Connection, target: String, pid: Int, server_id: Int) {
+  let target = sanitize(target, 30)
+  // join delete
+  // delete from resources if project not completed
+  let sql =
+    "DELETE target FROM
+    project as p JOIN target ON project.project_id = target.project_id
+    WHERE server_id = ? AND target.project_id = ? AND target.name = ?"
+  todo
+}
+
+pub fn list_projects(conn: Connection, server_id: Int) {
+  let sql =
+    "SELECT name, project_id FROM project
+    WHERE server_id = ? AND NOT completed;"
+  todo
+}
+
+pub fn list_contributors(conn: Connection, pid: Int, server_id: Int) {
+  // do via join projects and contributors
+  let sql =
+    "SELECT DISTINCT c.contributor_id
+    FROM project as p
+    JOIN target as t ON p.project_id = t.project_id
+    JOIN contribution as c ON t.target_id = c.target_id
+    WHERE p.server_id = ? AND c.project_id = ?;"
+  todo
+}
+
+pub fn list_contributions(conn: Connection, pid: Int, server_id: Int) {
+  // do via join projects, contributors, and resources
+  let sql =
+    "SELECT c.contributor_id, t.name, c.amount
+    FROM projects as p
+    JOIN target as t ON p.project_id = t.project_id
+    JOIN contribution as c ON t.target_id = c.target_id
+    ORDER BY t.name ASC, c.amount DESC;"
+  todo
+}
+
+pub fn list_targets(conn: Connection, pid: Int, server_id: Int) {
+  // do via join projects and resources
+  let sql =
+    "SELECT t.name, COALESCE(SUM(c.amount), 0), target_amount
+    FROM projects as p
+    JOIN target as t ON p.project_id = t.project_id
+    JOIN contribution as c ON t.target_id = c.target_id
+    ORDER BY t.name ASC, c.amount DESC;"
+  todo
+}
+
+pub fn contribute(
+  conn: Connection,
+  pid: Int,
+  name: String,
+  amount: Int,
+  uid: Int,
+  server_id: Int,
+) {
+  // add to contributions if target exists in server exists
+  // update failover to add
+  let sql =
+    "BEGIN TRANSACTION;
+
+    SELECT
+    CASE WHEN server_id = ?
+      THEN 1
+      ELSE RAISE(ABORT, 'server mismatch')
+      END
+    FROM project JOIN target ON project.project_id = target.project_id
+    WHERE target.project_id = ?;
+
+    INSERT INTO contribution
+      (target_id, contributor_id, amount)
+      VALUES (?, ?, ?)
+      ON CONFLICT(target_id, contributor_id)
+        DO UPDATE SET amount = excluded.amount + amount;
+
+    COMMIT;"
+  todo
+}
+
+pub fn complete_project(conn: Connection, pid: Int, server_id: Int) {
+  // update projects to completed if server matches
+  let sql =
+    "UPDATE project
+    SET completed = TRUE
+    WHERE project_id = ? AND server_id = ?
+    RETURNING name;"
+  todo
 }

@@ -9,3 +9,4 @@ pub fn main() {
 pub fn bot_test() {
   should.fail()
 }
+// add mocked tests
