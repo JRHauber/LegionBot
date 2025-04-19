@@ -1,6 +1,6 @@
 # Legionnaire Bot
 
-## This is a bot created for BitCraft resource management by Lanidae, Benevo, and Cj from The Legion.
+## This is a bot created for BitCraft resource management by Lanidae, and Benevo from The Legion.
 
 
 ## Requests Commands
