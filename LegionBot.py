@@ -5,6 +5,7 @@ from discord.ext import tasks
 import pickle
 import time
 import database_sqlite
+import random
 
 intents = discord.Intents.default()
 intents.members = True
@@ -27,15 +28,41 @@ db.setup_db()
 
 # create in promise on init
 
-LEGION_ID = discord.Object(1267584422253694996)
-
 def findProject(name):
     return next((i for i in project_list if i.name.lower() == name.lower()), -1)
+
+LEGION_ID = None
+ADVERTIZER_ROLE = None
+TICKET_ROLE = None
 
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
-    annoy_voxel.start()
+    global LEGION_ID
+    global ADVERTIZER_ROLE
+    global TICKET_ROLE
+    LEGION_ID = bot.get_guild(1267584422253694996)
+    ADVERTIZER_ROLE = LEGION_ID.get_role(1360478811661144114)
+    TICKET_ROLE = LEGION_ID.get_role(1324782094571798621)
+    #annoy_voxel.start()
+    legion_advert.start()
+    ticket_remind.start()
+
+@bot.event
+async def on_guild_channel_create(channel):
+    if "ticket" in channel.name.lower():
+        time.sleep(1)
+        await channel.send("""
+                           Hello! Welcome to the Legion Discord Server! Please answer these questions to help us get this started!
+        1) Have you read and agree to the ⁠rules?
+        2) Are you over 18?
+        3) Are you planning on joining the Legion, are a member of one of its Allies, or are just here to Visit?
+        4) What is your username in Bitcraft?
+        5) Are you currently a member of any other group?
+        6) What is your primary (and secondary if applicable) language?
+        7) What made you interested in joining The Legion? Were you invited by anyone?
+
+                           """)
 
 @bot.command()
 async def requestlist(ctx):
@@ -245,10 +272,29 @@ async def finishProject(ctx, pid : int):
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
 
-@tasks.loop(minutes=53.0)
-async def annoy_voxel():
-    user = await bot.fetch_user(112376667485323264)
-    if user:
-        await user.send("MAKE TREES NERD")
+#@tasks.loop(minutes=53.0)
+#async def annoy_voxel():
+#    user = await bot.fetch_user(112376667485323264)
+#    if user:
+#        await user.send("MAKE TREES NERD")
+
+@tasks.loop(minutes=971)
+async def legion_advert():
+    humans = [m for m in LEGION_ID.members if (not m.bot and (ADVERTIZER_ROLE in m.roles))]
+    pinged = random.choice(humans)
+    await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
+    print(f"Pinged {pinged.name}")
+
+@tasks.loop(minutes=1440)
+async def ticket_remind():
+    humans = [m for m in LEGION_ID.members if (not m.bot and (TICKET_ROLE in m.roles))]
+    for h in humans:
+        await h.send(f"""
+                     Hi! You joined The Legion discord server for Bitcraft, but seem to have not made a ticket.
+                     Please head to this channel: https://discord.com/channels/1267584422253694996/1317666800896577638
+                     and click the ***Create ticket*** button at the top of the channel in order to finish the process of joining The Legion.
+                     \n If you've already made a ticket, please make sure to read the questions in that channel and answer them in your created ticket.
+                     \n Thank you for your cooperation :)
+                     """)
 
 bot.run(token)
