@@ -1,7 +1,8 @@
+// todo: this file should be swapped for squirrel generated pog queries
+
 import gleam/dynamic/decode
 import gleam/option
 import gleam/regexp
-import gleam/result
 import gleam/string
 import sqlight
 
@@ -14,7 +15,7 @@ pub fn with_connection(name: String, f: fn(sqlight.Connection) -> a) -> a {
   f(conn)
 }
 
-pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, Nil) {
+pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, _) {
   sqlight.exec(
     // rename plural tables to singular
     "
@@ -49,12 +50,11 @@ pub fn migrate_schema(conn: sqlight.Connection) -> Result(Nil, Nil) {
       contributor_id INTEGER,
       amount INTEGER NOT NULL,
       PRIMARY KEY(target_id, contributor_id),
-      FOREIGN KEY(target_id) REFERENCES target(target_id),
+      FOREIGN KEY(target_id) REFERENCES target(target_id)
     );
     ",
     conn,
   )
-  |> result.map_error(fn(_) { Nil })
 }
 
 // '[^a-zA-Z0-9 ]+' sub out for nothing
@@ -262,6 +262,7 @@ pub fn get_requests(conn: Connection, server_id: Int) {
   }
 }
 
+// todo
 pub fn new_project(conn: Connection, server_id: Int, name: String, time: Int) {
   let name = sanitize(name, 30)
 
@@ -314,7 +315,24 @@ pub fn add_target(
 
     COMMIT;"
 
-  todo
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [
+        sqlight.int(server_id),
+        sqlight.int(pid),
+        sqlight.int(pid),
+        sqlight.text(target),
+        sqlight.int(amount),
+      ],
+      decode.int,
+    )
+
+  case result {
+    Ok(id) -> Ok(id)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
 pub fn remove_target(conn: Connection, target: String, pid: Int, server_id: Int) {
@@ -325,17 +343,35 @@ pub fn remove_target(conn: Connection, target: String, pid: Int, server_id: Int)
     "DELETE target FROM
     project as p JOIN target ON project.project_id = target.project_id
     WHERE server_id = ? AND target.project_id = ? AND target.name = ?"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid), sqlight.text(target)],
+      decode.int,
+    )
+
+  case result {
+    Ok(data) -> Ok(data)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
 pub fn list_projects(conn: Connection, server_id: Int) {
   let sql =
     "SELECT name, project_id FROM project
     WHERE server_id = ? AND NOT completed;"
-  todo
+
+  let result = sqlight.query(sql, conn, [sqlight.int(server_id)], decode.int)
+
+  case result {
+    Ok(data) -> Ok(data)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
-pub fn list_contributors(conn: Connection, pid: Int, server_id: Int) {
+pub fn list_contributors(conn: Connection, server_id: Int, pid: Int) {
   // do via join projects and contributors
   let sql =
     "SELECT DISTINCT c.contributor_id
@@ -343,29 +379,67 @@ pub fn list_contributors(conn: Connection, pid: Int, server_id: Int) {
     JOIN target as t ON p.project_id = t.project_id
     JOIN contribution as c ON t.target_id = c.target_id
     WHERE p.server_id = ? AND c.project_id = ?;"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid)],
+      decode.int,
+    )
+
+  case result {
+    Ok(data) -> Ok(data)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
-pub fn list_contributions(conn: Connection, pid: Int, server_id: Int) {
+pub fn list_contributions(conn: Connection, server_id: Int, pid: Int) {
   // do via join projects, contributors, and resources
   let sql =
     "SELECT c.contributor_id, t.name, c.amount
     FROM projects as p
     JOIN target as t ON p.project_id = t.project_id
     JOIN contribution as c ON t.target_id = c.target_id
+    WHERE p.server_id = ? AND c.project_id = ?
     ORDER BY t.name ASC, c.amount DESC;"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid)],
+      decode.int,
+    )
+
+  case result {
+    Ok(data) -> Ok(data)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
-pub fn list_targets(conn: Connection, pid: Int, server_id: Int) {
+pub fn list_targets(conn: Connection, server_id: Int, pid: Int) {
   // do via join projects and resources
   let sql =
     "SELECT t.name, COALESCE(SUM(c.amount), 0), target_amount
     FROM projects as p
     JOIN target as t ON p.project_id = t.project_id
     JOIN contribution as c ON t.target_id = c.target_id
+    WHERE p.server_id = ? AND c.project_id = ?
     ORDER BY t.name ASC, c.amount DESC;"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid)],
+      decode.int,
+    )
+
+  case result {
+    Ok(id) -> Ok(id)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
 pub fn contribute(
@@ -396,15 +470,39 @@ pub fn contribute(
         DO UPDATE SET amount = excluded.amount + amount;
 
     COMMIT;"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid)],
+      decode.int,
+    )
+
+  case result {
+    Ok(id) -> Ok(id)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
 
-pub fn complete_project(conn: Connection, pid: Int, server_id: Int) {
+pub fn complete_project(conn: Connection, server_id: Int, pid: Int) {
   // update projects to completed if server matches
   let sql =
     "UPDATE project
     SET completed = TRUE
     WHERE project_id = ? AND server_id = ?
     RETURNING name;"
-  todo
+
+  let result =
+    sqlight.query(
+      sql,
+      conn,
+      [sqlight.int(server_id), sqlight.int(pid)],
+      decode.int,
+    )
+
+  case result {
+    Ok(id) -> Ok(id)
+    Error(_) -> Error("Sqlite Error")
+  }
 }
