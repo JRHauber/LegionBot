@@ -44,7 +44,6 @@ async def on_ready():
     LEGION_ID = bot.get_guild(1267584422253694996)
     ADVERTIZER_ROLE = LEGION_ID.get_role(1360478811661144114)
     TICKET_ROLE = LEGION_ID.get_role(1324782094571798621)
-    #annoy_voxel.start()
     legion_advert.start()
     ticket_remind.start()
 
@@ -271,12 +270,6 @@ async def finishProject(ctx, pid : int):
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
-
-#@tasks.loop(minutes=53.0)
-#async def annoy_voxel():
-#    user = await bot.fetch_user(112376667485323264)
-#    if user:
-#        await user.send("MAKE TREES NERD")
 
 @tasks.loop(minutes=971)
 async def legion_advert():
