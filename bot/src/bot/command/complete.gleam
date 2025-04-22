@@ -1,5 +1,5 @@
 import bot/context
-import bot/database
+import database/database
 import discord_gleam
 import discord_gleam/ws/packets/message
 import gleam/int
@@ -17,7 +17,7 @@ pub fn complete(
     [arg, ..] -> {
       use id <- result.try(int.parse(arg))
       use req <- result.try(
-        database.complete_request(ctx.db, guild_id, uid, id)
+        database.request_complete(ctx.db, guild_id, id, uid)
         |> result.map_error(fn(_) { Nil }),
       )
       Ok(
@@ -31,7 +31,7 @@ pub fn complete(
             <> message.d.author.id
             <> ">"
             <> "\nID: "
-            <> int.to_string(req.id)
+            <> int.to_string(req.request_id)
             <> "\n"
             <> req.resource_message,
           [],

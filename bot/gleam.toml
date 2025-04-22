@@ -21,6 +21,8 @@ gleam_regexp = ">= 1.1.0 and < 2.0.0"
 envoy = ">= 1.0.2 and < 2.0.0"
 simplifile = ">= 2.2.1 and < 3.0.0"
 hackney = "~> 1.21.0" # changed pending fix of https://github.com/benoitc/hackney/issues/764
+pog = ">= 3.2.0 and < 4.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
+squirrel = ">= 3.0.2 and < 4.0.0"

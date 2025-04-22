@@ -18,9 +18,8 @@ let
 in
 {
   env.PGHOST = "localhost";
-  # env.PGPORT = "5432";
   env.PGUSER = "ben";
-  env.PGDATABASE = "ben";
+  env.PGDATABASE = "centurion";
   env.PGPASSWORD = "";
 
   languages = {
@@ -44,7 +43,8 @@ in
   ];
 
   enterShell = ''
-    echo "hello"
+    geam --version
+    matcha --version
   '';
 
   services = {

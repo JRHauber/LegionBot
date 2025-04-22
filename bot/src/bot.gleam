@@ -7,7 +7,6 @@ import bot/command/requests
 import bot/command/unclaim
 import bot/command/whois
 import bot/context
-import bot/database
 import discord_gleam
 import discord_gleam/discord/intents
 import discord_gleam/event_handler
@@ -15,16 +14,21 @@ import discord_gleam/types/bot
 import discord_gleam/ws/packets/message
 import dotenv
 import envoy
+import gleam/option
 import logging
-
-const db_name = "bot.sqlite3"
+import pog
 
 pub fn main() {
+  // load env
   dotenv.config()
-  // this should load .env file
 
   let assert Ok(bot_token) = envoy.get("BOT_TOKEN")
   let assert Ok(bot_id) = envoy.get("BOT_ID")
+
+  let assert Ok(db_host) = envoy.get("PGHOST")
+  let assert Ok(db_name) = envoy.get("PGDATABASE")
+  let assert Ok(db_user) = envoy.get("USER")
+  let assert Ok(db_pass) = envoy.get("PGPASSWORD")
 
   logging.configure()
   logging.set_level(logging.Info)
@@ -39,8 +43,14 @@ pub fn main() {
 
   let bot = discord_gleam.bot(bot_token, bot_id, intents)
 
-  use db <- database.with_connection(db_name)
-  let assert Ok(_) = database.migrate_schema(db)
+  let db =
+    pog.default_config()
+    |> pog.host(db_host)
+    |> pog.database(db_name)
+    |> pog.pool_size(15)
+    |> pog.user(db_user)
+    |> pog.password(option.Some(db_pass))
+    |> pog.connect
 
   let bot_handler = fn(bot: bot.Bot, event: event_handler.Packet) {
     let ctx = context.Context(db:, bot:)

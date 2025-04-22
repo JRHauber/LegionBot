@@ -1,18 +1,20 @@
 import bot/context
-import bot/database
 import bot/helpers
+import database/database
+import database/sql
 import discord_gleam
 import discord_gleam/discord/snowflake
 import discord_gleam/ws/packets/message
 import gleam/int
 import gleam/list
 import gleam/option
+import gleam/pair
 import gleam/result
 
 fn format_message(
   ctx: context.Context,
   acc: String,
-  data: List(database.UserRequest),
+  data: List(sql.RequestGetClaimsRow),
 ) -> String {
   case data {
     [] -> "```\n" <> acc
@@ -29,7 +31,7 @@ fn format_message(
 
       format_message(
         ctx,
-        int.to_string(req.id)
+        int.to_string(req.request_id)
           <> " - "
           <> username
           <> " - "
@@ -45,7 +47,7 @@ fn format_message(
 fn send_messages(
   ctx: context.Context,
   channel_id: snowflake.Snowflake,
-  data: List(database.UserRequest),
+  data: List(_),
 ) -> Nil {
   let #(first, second) = list.split(data, 30)
   case first {
@@ -66,8 +68,8 @@ pub fn claims(ctx: context.Context, message: message.MessagePacket) {
   use guild_id <- result.try(int.parse(message.d.guild_id))
   use uid <- result.try(int.parse(message.d.author.id))
   use requests <- result.try(
-    database.get_claims(ctx.db, guild_id, uid)
+    database.request_get_claims(ctx.db, guild_id, uid)
     |> result.map_error(fn(_) { Nil }),
   )
-  Ok(send_messages(ctx, message.d.channel_id, requests))
+  Ok(send_messages(ctx, message.d.channel_id, requests |> pair.second))
 }

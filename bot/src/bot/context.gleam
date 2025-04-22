@@ -1,6 +1,6 @@
-import bot/database
 import discord_gleam/types/bot
+import pog
 
 pub type Context {
-  Context(db: database.Connection, bot: bot.Bot)
+  Context(db: pog.Connection, bot: bot.Bot)
 }

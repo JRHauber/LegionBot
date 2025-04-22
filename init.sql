@@ -1,15 +1,15 @@
 CREATE TABLE IF NOT EXISTS request (
     request_id SERIAL PRIMARY KEY,
-    server_id INTEGER NOT NULL,
+    server_id BIGINT NOT NULL,
     filled BOOLEAN NOT NULL,
-    requestor_id INTEGER NOT NULL,
-    claimant_id INTEGER,
+    requestor_id BIGINT NOT NULL,
+    claimant_id BIGINT,
     resource_message VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS project (
     project_id SERIAL PRIMARY KEY,
-    server_id INTEGER NOT NULL,
+    server_id BIGINT NOT NULL,
     p_name VARCHAR(30) NOT NULL,
     p_time TIMESTAMP NOT NULL,
     completed BOOLEAN NOT NULL
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS target (
 
 CREATE TABLE IF NOT EXISTS contribution (
     target_id INTEGER NOT NULL,
-    contributor_id INTEGER,
+    contributor_id BIGINT,
     amount INTEGER NOT NULL,
     PRIMARY KEY(target_id, contributor_id),
     FOREIGN KEY(target_id) REFERENCES target(target_id)

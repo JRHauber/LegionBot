@@ -1,5 +1,5 @@
 import bot/context
-import bot/database
+import database/database
 import discord_gleam
 import discord_gleam/ws/packets/message
 import gleam/int
@@ -13,7 +13,7 @@ pub fn request(
   use guild_id <- result.try(int.parse(message.d.guild_id))
   use uid <- result.try(int.parse(message.d.author.id))
   use id <- result.try(
-    database.create_request(ctx.db, guild_id, uid, content)
+    database.request_create(ctx.db, guild_id, uid, content)
     |> result.map_error(fn(_) { Nil }),
   )
   Ok(
@@ -24,7 +24,7 @@ pub fn request(
         <> message.d.author.id
         <> ">"
         <> "\nID: "
-        <> int.to_string(id)
+        <> int.to_string(id.request_id)
         <> "\n"
         <> content,
       [],

@@ -1,5 +1,5 @@
 import bot/context
-import bot/database
+import database/database
 import discord_gleam
 import discord_gleam/ws/packets/message
 import gleam/int
@@ -17,14 +17,14 @@ pub fn unclaim(
     [arg, ..] -> {
       use id <- result.try(int.parse(arg))
       use req <- result.try(
-        database.unclaim_request(ctx.db, guild_id, uid, id)
+        database.request_unclaim(ctx.db, guild_id, id, uid)
         |> result.map_error(fn(_) { Nil }),
       )
       Ok(
         discord_gleam.send_message(
           ctx.bot,
           message.d.channel_id,
-          "unclaimed request " <> int.to_string(req.id),
+          "unclaimed request " <> int.to_string(req.request_id),
           [],
         ),
       )

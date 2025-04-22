@@ -1,18 +1,20 @@
 import bot/context
-import bot/database
 import bot/helpers
+import database/database
+import database/sql
 import discord_gleam
 import discord_gleam/discord/snowflake
 import discord_gleam/ws/packets/message
 import gleam/int
 import gleam/list
 import gleam/option
+import gleam/pair
 import gleam/result
 
 fn format_message(
   ctx: context.Context,
   acc: String,
-  data: List(database.UserRequest),
+  data: List(sql.RequestGetServerRow),
 ) -> String {
   // needs formatting
   case data {
@@ -36,7 +38,7 @@ fn format_message(
 
       format_message(
         ctx,
-        int.to_string(req.id)
+        int.to_string(req.request_id)
           <> " - "
           <> requestor
           <> " - "
@@ -54,7 +56,7 @@ fn format_message(
 fn send_messages(
   ctx: context.Context,
   channel_id: snowflake.Snowflake,
-  data: List(database.UserRequest),
+  data: List(sql.RequestGetServerRow),
 ) -> Nil {
   let #(first, second) = list.split(data, 15)
 
@@ -75,8 +77,8 @@ fn send_messages(
 pub fn request_list(ctx: context.Context, message: message.MessagePacket) {
   use guild_id <- result.try(int.parse(message.d.guild_id))
   use requests <- result.try(
-    database.get_requests(ctx.db, guild_id)
+    database.request_get_server(ctx.db, guild_id)
     |> result.map_error(fn(_) { Nil }),
   )
-  Ok(send_messages(ctx, message.d.channel_id, requests))
+  Ok(send_messages(ctx, message.d.channel_id, requests |> pair.second))
 }
