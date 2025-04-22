@@ -1,0 +1,43 @@
+import bot/context
+import database/database
+import discord_gleam
+import discord_gleam/ws/packets/message
+import gleam/int
+import gleam/result
+import gleam/string
+
+pub fn complete(
+  ctx: context.Context,
+  message: message.MessagePacket,
+  content: String,
+) {
+  use guild_id <- result.try(int.parse(message.d.guild_id))
+  use uid <- result.try(int.parse(message.d.author.id))
+  case string.split(content, " ") {
+    [arg, ..] -> {
+      use id <- result.try(int.parse(arg))
+      use req <- result.try(
+        database.request_complete(ctx.db, guild_id, id, uid)
+        |> result.map_error(fn(_) { Nil }),
+      )
+      Ok(
+        discord_gleam.send_message(
+          ctx.bot,
+          message.d.channel_id,
+          "<@"
+            <> int.to_string(req.requestor_id)
+            <> ">"
+            <> "\nCompleted by: <@"
+            <> message.d.author.id
+            <> ">"
+            <> "\nID: "
+            <> int.to_string(req.request_id)
+            <> "\n"
+            <> req.resource_message,
+          [],
+        ),
+      )
+    }
+    [] -> Error(Nil)
+  }
+}
