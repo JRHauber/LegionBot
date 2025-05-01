@@ -6,6 +6,7 @@ import pickle
 import asyncio
 import database_sqlite
 import random
+import time
 
 intents = discord.Intents.default()
 intents.members = True
