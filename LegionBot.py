@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord.utils import get
 from discord.ext import tasks
 import pickle
-import time
+import asyncio
 import database_sqlite
 import random
 
@@ -50,7 +50,7 @@ async def on_ready():
 @bot.event
 async def on_guild_channel_create(channel):
     if "ticket" in channel.name.lower():
-        time.sleep(1)
+        asyncio.sleep(1)
         await channel.send("""
                            Hello! Welcome to the Legion Discord Server! Please answer these questions to help us get this started!
         1) Have you read and agree to the ⁠rules?
@@ -276,7 +276,7 @@ async def legion_advert():
     humans = [m for m in LEGION_ID.members if (not m.bot and (ADVERTIZER_ROLE in m.roles))]
     pinged = random.choice(humans)
     await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
-    print(f"Pinged {pinged.name}")
+    print(f"Pinged {pinged.name} to advertise.")
 
 @tasks.loop(minutes=1440)
 async def ticket_remind():
@@ -289,5 +289,6 @@ async def ticket_remind():
                      \n If you've already made a ticket, please make sure to read the questions in that channel and answer them in your created ticket.
                      \n Thank you for your cooperation :)
                      """)
+        print(f"Pinged {h.name} to make a ticket.")
 
 bot.run(token)
