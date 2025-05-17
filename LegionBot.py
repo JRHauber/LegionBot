@@ -317,10 +317,13 @@ async def finishProject(ctx, pid : int):
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
 
-@tasks.loop(minutes=971)
+@tasks.loop(minutes=67)
 async def legion_advert():
-    if legion_advert.current_loop == 0:
+    global STATE
+    if int(dt.datetime.now().timestamp()) - STATE['LAST_ANNOUNCE'] < 57600:
         return
+    STATE['LAST_ANNOUNCE'] = int(dt.datetime.now().timestamp())
+    save_state(STATE)
     humans = [m for m in LEGION_ID.members if (not m.bot and (ADVERTIZER_ROLE in m.roles))]
     pinged = random.choice(humans)
     await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
