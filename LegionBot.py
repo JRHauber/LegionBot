@@ -18,15 +18,25 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix = '$', intents=intents)
 
-try:
-    project_list = pickle.load(open("project_list.p", "rb"))
-except FileNotFoundError:
-    project_list = []
+def load_pickle_files():
+    global project_list
+    global votes
+    global candidates
+    try:
+        project_list = pickle.load(open("project_list.p", "rb"))
+    except FileNotFoundError:
+        project_list = []
 
-try:
-    votes = pickle.load(open("votes.p", "rb"))
-except FileNotFoundError:
-    votes = []
+    try:
+        votes = pickle.load(open("votes.p", "rb"))
+    except FileNotFoundError:
+        votes = []
+
+    try:
+        candidates = pickle.load(open("candidates.p", "rb"))
+    except FileNotFoundError:
+        candidates = []
+    return
 
 db = database_sqlite.DatabaseSqlite()
 db.setup_db()
@@ -42,30 +52,21 @@ def load_state(filename = 'state.json'):
     except FileNotFoundError:
         return {}
 
-annoy_time = dt.time(hour = 0, minute = 0, second = 0)
-
-# create in promise on init
-
-def findProject(name):
-    return next((i for i in project_list if i.name.lower() == name.lower()), -1)
-
 LEGION_ID = None
 ADVERTIZER_ROLE = None
 TICKET_ROLE = None
 STATE = None
+ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0)
+project_list = None
+votes = None
+candidates = None
 
 NEW_SENATOR_INSTRUCTION_DESCRIPTIONS = ["Ticket Guide", "Perms Description"]
 NEW_SENATOR_INSTRUCTIONS = ["https://discord.com/channels/1267584422253694996/1311826613050150912/1356423214401720320", "https://discord.com/channels/1267584422253694996/1311826613050150912/1371791895390453880"]
 
 GUILD_ID = discord.Object(id=1267584422253694996)
-
 DISCIPLINARY_ROLES = [1367304039137542155, 1367304098659176641]
 #Prob 1, Prob 2
-
-try:
-    candidates = pickle.load(open("candidates.p", "rb"))
-except FileNotFoundError:
-    candidates = []
 
 @bot.event
 async def on_ready():
@@ -80,6 +81,7 @@ async def on_ready():
     STATE = load_state()
     legion_advert.start()
     ticket_remind.start()
+    load_pickle_files()
 
 
 @bot.event
@@ -329,7 +331,7 @@ async def legion_advert():
     await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
     print(f"Pinged {pinged.name} to advertise.")
 
-@tasks.loop(time=annoy_time)
+@tasks.loop(time=ANNOY_TIME)
 async def ticket_remind():
     if ticket_remind.current_loop == 0:
         return
@@ -355,6 +357,7 @@ async def synccmd(ctx: commands.Context):
     return
 
 @bot.tree.command(name="candidate", description="Declare yourself as a candidate for Senate.", guild=GUILD_ID)
+@app_commands.checks.has_role(1268739778119995505)
 async def candidate(interaction: discord.Interaction):
     # Check for ongoing election
     if not STATE['ELECTION_STARTED']:
@@ -402,6 +405,7 @@ async def start_election(interaction: discord.Interaction):
     await interaction.response.send_message("You've started an election!", ephemeral=True)
 
 @bot.tree.command(name = "vote", description="Vote for a candidate!", guild = GUILD_ID)
+@app_commands.checks.has_role(1268739778119995505)
 async def vote(interaction: discord.Interaction, cid: int):
     for c in candidates:
         if c.cid == cid:
@@ -411,6 +415,7 @@ async def vote(interaction: discord.Interaction, cid: int):
             return
 
 @bot.tree.command(name = "remove_vote", description = "Remove your vote for a candidate", guild = GUILD_ID)
+@app_commands.checks.has_role(1268739778119995505)
 async def remove_vote(interaction: discord.Interaction, cid: int):
     for c in candidates:
         if c.cid == cid:
@@ -420,6 +425,7 @@ async def remove_vote(interaction: discord.Interaction, cid: int):
             return
 
 @bot.tree.command(name = "list_candidates", description = "List all candidates for the election", guild = GUILD_ID)
+@app_commands.checks.has_role(1268739778119995505)
 async def list_candidates(interaction: discord.Interaction):
     output = ""
     for c in candidates:
