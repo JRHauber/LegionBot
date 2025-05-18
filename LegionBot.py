@@ -333,10 +333,16 @@ async def legion_advert():
 
 @tasks.loop(time=ANNOY_TIME)
 async def ticket_remind():
-    if ticket_remind.current_loop == 0:
-        return
     humans = [m for m in LEGION_ID.members if (not m.bot and (TICKET_ROLE in m.roles))]
     for h in humans:
+        date_check = dt.datetime.now().replace(tzinfo=None) - h.joined_at.replace(tzinfo=None)
+        if date_check.days > 30:
+            await h.send(f"""
+                It looks like you've been in the Legion discord for over a month without making a ticket.
+                You have been automatically removed from the server to help maintain its cleanliness.
+                If you believe this was in error, please rejoin the server and make a ticket.
+            """)
+            await h.kick()
         await h.send(f"""
                      Hi! You joined The Legion discord server for Bitcraft, but seem to have not made a ticket.
                      Please head to this channel: https://discord.com/channels/1267584422253694996/1317666800896577638
@@ -372,8 +378,14 @@ async def candidate(interaction: discord.Interaction):
 
     # Check user join date
     date_check = dt.datetime.now().replace(tzinfo=None) - interaction.user.joined_at.replace(tzinfo=None)
+    print(date_check.days)
     if date_check.days < 30:
         await interaction.response.send_message("You haven't been here long enough! You need to have been in the guild for at least one month to be a Senator!", ephemeral=True)
+        return
+
+    # Check if new candidate declarations are allowed
+    if not STATE['CANDIDATES_ALLOWED']:
+        await interaction.response.send_message("Sorry, the period to declare your candidacy has ended. You'll have to try again next election", ephemeral=True)
         return
 
     # Check if user is already a candidate
@@ -396,13 +408,33 @@ async def candidate(interaction: discord.Interaction):
     """, ephemeral = True)
     pickle.dump(candidates, open("candidates.p", "wb"))
 
+
 @bot.tree.command(name="start_election", description="Start an election!", guild = GUILD_ID)
 @app_commands.checks.has_role(1311825324308303913)
 async def start_election(interaction: discord.Interaction):
     global STATE
     STATE['ELECTION_STARTED'] = True
+    STATE['CANDIDATES_ALLOWED'] = True
     save_state(STATE)
     await interaction.response.send_message("You've started an election!", ephemeral=True)
+
+@bot.tree.command(name="start_voting", description = "Start voting", guild = GUILD_ID)
+@app_commands.checks.has_role(1311825324308303913)
+async def start_voting(interaction: discord.Interaction):
+    global STATE
+    STATE['CANDIDATES_ALLOWED'] = False
+    save_state(STATE)
+    await interaction.response.send_message("Stopped candidates from declaring so voting can start.", ephemeral = True)
+
+@bot.tree.command(name="withdraw", description="Withdraw yourself as a candidate", guild=GUILD_ID)
+@app_commands.checks.has_role(1268739778119995505)
+async def withdraw(interaction: discord.Interaction):
+    for c in candidates:
+        if c.uid == interaction.member.id:
+            candidates.remove(c)
+            pickle.dump(candidates, open("candidates.p", "wb"))
+            await interaction.response.send_message("You have removed yourself as a candidate", ephemeral = True)
+            return
 
 @bot.tree.command(name = "vote", description="Vote for a candidate!", guild = GUILD_ID)
 @app_commands.checks.has_role(1268739778119995505)
@@ -483,4 +515,15 @@ async def count_professions(interaction: discord.Interaction):
     output += "```"
     await interaction.followup.send(output, ephemeral=True)
     return
+
+@bot.tree.error
+async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+    if isinstance(error, discord.app_commands.MissingPermissions):
+        await interaction.response.send_message("Sorry, you don't have the permissions to run that command.", ephemeral=True)
+        return
+    if isinstance(error, discord.app_commands.MissingRole):
+        await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
+        return
+    await interaction.response.send_message(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
+
 bot.run(token)
