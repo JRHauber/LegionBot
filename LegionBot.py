@@ -11,6 +11,8 @@ import datetime as dt
 import candidate as cand
 import json
 import os
+from zoneinfo import ZoneInfo
+import time
 
 intents = discord.Intents.default()
 intents.members = True
@@ -56,13 +58,12 @@ LEGION_ID = None
 ADVERTIZER_ROLE = None
 TICKET_ROLE = None
 STATE = None
-ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0)
+ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
 project_list = None
 votes = None
 candidates = None
-
-NEW_SENATOR_INSTRUCTION_DESCRIPTIONS = ["Ticket Guide", "Perms Description"]
-NEW_SENATOR_INSTRUCTIONS = ["https://discord.com/channels/1267584422253694996/1311826613050150912/1356423214401720320", "https://discord.com/channels/1267584422253694996/1311826613050150912/1371791895390453880"]
+SENATOR_ROLE = 1311824922301038632
+ADMINISTRATOR_ROLE = 1371792303206699040
 
 GUILD_ID = discord.Object(id=1267584422253694996)
 DISCIPLINARY_ROLES = [1367304039137542155, 1367304098659176641]
@@ -82,6 +83,7 @@ async def on_ready():
     legion_advert.start()
     ticket_remind.start()
     load_pickle_files()
+    #ping_metronome.start()
 
 
 @bot.event
@@ -111,20 +113,21 @@ async def on_member_join(member):
     """)
     print(f"Pinged {member.name} with join info")
 
-@bot.command()
-async def requestlist(ctx):
+@bot.tree.command(name = "request_list", description = "Get a list of open requests")
+async def request_list(interaction: discord.Interaction):
+    await interaction.response.defer()
     output = "```"
     namePadding = 0
     requestPadding = 0
     claimantPadding = 0
 
-    data = await db.get_requests(int(ctx.message.guild.id))
+    data = await db.get_requests(int(interaction.guild.id))
     for r in data:
         if r.claimant_id == None:
             claim_name = "Unclaimed"
         else:
-            claim_name = ctx.message.guild.get_member(int(r.claimant_id)).display_name
-        user_name = ctx.message.guild.get_member(int(r.requestor_id)).display_name
+            claim_name = interaction.guild.get_member(r.claimant_id).display_name
+        user_name = interaction.guild.get_member(r.requestor_id).display_name
         resource = r.resource[0:40]
         namePadding = max(namePadding, len(user_name))
         requestPadding = max(requestPadding, len(resource))
@@ -139,185 +142,191 @@ async def requestlist(ctx):
         if r.claimant_id == None:
             claim_name = "Unclaimed"
         else:
-            claim_name = ctx.message.guild.get_member(int(r.claimant_id)).display_name
-        if len(r.resource) > 40:
+            claim_name = interaction.guild.get_member(r.claimant_id).display_name
+        if len(r.resource > 40):
             resource = r.resource[0:40]
             resource += "..."
         else:
             resource = r.resource
-        user_name = ctx.message.guild.get_member(int(r.requestor_id)).display_name
-        output += f"\n {user_name: <{namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
+        user_name = interaction.guild.get_member(r.requestor_id).display_name
+        output += f"\n {user_name: < {namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
         count += 1
 
         if count % 10 == 0:
             output += "```"
-            await ctx.send(output)
+            await interaction.followup.send(output)
             output = "```"
-    output += "```"
-    await ctx.send(output)
+        elif count == len(data) - 1:
+            output += "```"
+            await interaction.followup.send(output)
 
-@bot.command()
-async def setup(ctx):
-    await ctx.send("Test")
+@bot.tree.command(name = "request", description = "Request a resource")
+async def request(interaction: discord.Interaction, resource: str):
+    id = await db.insert_request(interaction.guild_id, interaction.user.id, resource)
+    await interaction.response.send_message(f"""
+    Requester: {interaction.user.mention}
+    Resource: {resource}
+    ID: {id}
+    """, ephemeral = True)
 
-@bot.command()
-async def request(ctx, *, message="Test Message"):
-    id = await db.insert_request(ctx.message.guild.id, int(ctx.author.id), message)
-    await ctx.send(f"""
-        Requester: {ctx.author.mention}
-        Message: {message}
-        ID: {id}
-        """)
+@bot.tree.command(name = "claim", description = "Claim a resource request")
+async def claim(interaction: discord.Interaction, id: int):
+    currentRequest = await db.claim_request(id, interaction.guild_id, interaction.user.id)
 
-@bot.command()
-async def claim(ctx, id= -1):
-    currentRequest = await db.claim_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
     if currentRequest == None:
-        await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
+        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
         return
 
-    await ctx.send(f"""
+    interaction.response.send_message(f"""
     <@{currentRequest.requestor_id}>
-        Claimant: {ctx.author.display_name.capitalize()}
+        Claimant: {interaction.user.display_name.capitalize()}
         Resource: {currentRequest.resource}
-        ID: {currentRequest.id}
-        """)
-
-@bot.command()
-async def unclaim(ctx, id = -1):
-    currentRequest = await db.unclaim_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
-    if currentRequest == None:
-        await ctx.send("Invalid ID, double check that the request ID is right!", delete_after=10.0)
-        return
-    await ctx.send("You have successfully unclaimed " + currentRequest.resource + "!")
-
-@bot.command()
-async def complete(ctx, id=-1):
-    currentRequest = await db.finish_request(int(id), int(ctx.message.guild.id), int(ctx.author.id))
-    if currentRequest == None:
-        await ctx.send("Please enter a proper ID!", delete_after=10.0)
-        return
-
-    await ctx.send(f"""
-        <@{currentRequest.requestor_id}>
-        Completer: {ctx.author.display_name.capitalize()}
-        Resource: {currentRequest.resource}
-        ID: {currentRequest.id}
+        ID: {id}
     """)
 
-@bot.command()
-async def claims(ctx):
-    data = await db.get_claims(int(ctx.message.guild.id), int(ctx.author.id))
+@bot.tree.command(name = "unclaim", description = "Unclaim a request")
+async def unclaim(interaction: discord.Interaction, id: int):
+    currentRequest = await db.unclaim_request(id, interaction.guild_id, interaction.user.id)
+
+    if currentRequest == None:
+        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
+        return
+
+    interaction.response.send_message(f"You have successfully unclaimed {currentRequest.resource} ({id})", ephemeral=True)
+
+@bot.tree.command(name = "complete", description = "Complete a request")
+async def complete(interaction: discord.Interaction, id: int):
+    currentRequest = await db.claim_request(id, interaction.guild_id, interaction.user.id)
+
+    if currentRequest == None:
+        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
+        return
+
+    await interaction.response.send_message(f"""
+    <@{currentRequest.requestor_id}>the
+        Completer: {interaction.user.display_name.capitalize()}
+        Resource: {currentRequest.resource}
+        ID: {id}
+    """)
+
+@bot.tree.command(name = "claims", description = "See which requests you've claimed")
+async def claims(interaction: discord.Interaction):
+    data = await db.get_claims(interaction.guild_id, interaction.user.id)
+    out = ''
+
+    for d in data:
+        user_name = interaction.guild.get_member(d.requestor_id).display_name
+        out += f" {d.id} - {user_name.capitalize()} - {d.resource}\n"
+    interaction.response.send_message(f"{interaction.user.display_name}'s requests: \n {out}", ephemeral = True)
+
+@bot.tree.command(name = "requests", description = "See a list of requests you've made")
+async def requests(interaction: discord.Interaction):
+    data = await db.get_user_requests(interaction.guild_id, interaction.user.id)
     out = ''
     for d in data:
-        user_name = ctx.message.guild.get_member(int(d.requestor_id)).display_name
-        out += ' ' + str(d.id) + ' - ' + user_name.capitalize() + ' - ' + d.resource + '\n'
-    await ctx.send(f'{ctx.author.display_name}\'s claims:\n {out}')
+        out += f" {d.id} - {interaction.user.display_name.capitalize()} - {d.resource}\n"
+    await interaction.response.send_message(f"Your requests:\n {out}", ephemeral = True)
 
-@bot.command()
-async def requests(ctx):
-    data = await db.get_user_requests(int(ctx.message.guild.id), int(ctx.author.id))
-    out = ''
-    for d in data:
-        user_name = ctx.message.guild.get_member(int(d.requestor_id)).display_name
-        out += ' ' + str(d.id) + ' - ' + user_name.capitalize() + ' - ' + d.resource + '\n'
-    await ctx.send(f'{ctx.author.display_name}\'s requests:\n {out}')
+@bot.tree.command(name = "new_project", description = "Create a new project")
+async def new_project(interaction: discord.Interaction, name: str):
+    data = await db.new_project(interaction.guild_id, name, time.time())
 
-@bot.command()
-async def newProject(ctx, name : str):
-    data = await db.new_project(int(ctx.message.guild.id), name, time.time())
     if data == None:
-        await ctx.send("Something went wrong and your project didn't get made... idk what happened. Contact Lanidae I guess.")
+        await interaction.response.send_message("Something went wrong and your project didn't get made... idk how. Contact Lanidae I guess")
     else:
-        await ctx.send(f"Your project has been created! Your project name is {name} and your project id is {data}")
+        await interaction.response.send_message(f"Your project has been created! Your project's name is {name} and its id is {data}")
 
-@bot.command()
-async def addResource(ctx, count, pid, *, resource):
-    await db.add_resource(resource, int(count), int(pid), int(ctx.message.guild.id))
-    await ctx.send(f"Resource added! You added {count} - {resource} to project: {pid}")
+@bot.tree.command(name = "add_resource", description = "Add a resource to the project")
+async def add_resource(interaction: discord.Interaction, resource: str, amount: int, project: int):
+    await db.add_resource(resource, amount, project, interaction.guild_id)
+    await interaction.response.send_message(f"You have added the resource: {amount} - {resource} to project: {project}")
 
-@bot.command()
-async def removeResource(ctx, pid, *, resource):
-    await db.remove_resource(resource, int(pid), int(ctx.message.guild.id))
-    await ctx.send(f"Resource removed! You removed {resource} from project: {pid}")
+@bot.tree.command(name = "remove_resource", description = "Remove a resource from a project")
+async def remove_resource(interaction: discord.Interaction, resource: str, project: int):
+    await db.remove_resource(resource, project, interaction.guild_id)
+    await interaction.response.send_message(f"You have removed {resource} from project: {project}")
 
-@bot.command()
-async def listProjects(ctx):
-    data = await db.list_projects(int(ctx.message.guild.id))
+@bot.tree.command(name = "list_projects", description = "Display a list of active project")
+async def list_projects(interaction: discord.Interaction):
+    await interaction.response.defer()
+    data = await db.list_projects(interaction.guild_id)
     output = "```"
     count = 0
     for p in data:
-        output += "\n" + p[0].title() + " - " + str(p[1])
+        output += f"\n {p[0].title()} - {p[1]}"
         count += 1
         if count % 20 == 0:
             output += "```"
-            await ctx.send(output)
+            await interaction.followup.send(output)
             output = "```"
-    output += "```"
-    await ctx.send(output)
+        elif count == len(data) - 1:
+            output += "```"
+            await interaction.followup.send(output)
 
-@bot.command()
-async def getContributors(ctx, pid):
-    data = await db.list_contributors(pid, int(ctx.message.guild.id))
+@bot.tree.command(name = "get_contributors", description = "Get a list of people who have contributed to this project")
+async def get_contributors(interaction: discord.Interaction, project: int):
+    data = await db.list_contributors(project, interaction.guild_id)
     output = "```"
     count = 0
     for c in data:
-        output += "\n" + ctx.message.guild.get_member(int(c[0])).display_name
+        output += f"\n{interaction.guild.get_member(c[0]).display_name}"
         count += 1
         if count % 20 == 0:
             output += "```"
-            await ctx.send("output")
+            await interaction.followup.send(output)
             output = "```"
-    output += "```"
-    await ctx.send(output)
+        elif count == len(data) - 1:
+            output += "```"
+            await interaction.followup.send(output)
 
-@bot.command()
-async def getContributions(ctx, pid):
-    data = await db.list_contributions(pid, int(ctx.message.guild.id))
+@bot.tree.command(name = "get_contributions", description = "Get a list of what resources members have been contributed to this project")
+async def get_contributions(interaction: discord.Interaction, project: int):
+    await interaction.response.defer()
+    data = await db.list_contributions(project, interaction.guild_id)
     output = "```"
     count = 0
     lastid = None
     for c in data:
-        if lastid != c[0]:
-            output += f"\n{ctx.message.guild.get_member(int(c[0])).display_name}"
+        if lastid != c[0] or count % 20 == 0:
             lastid = c[0]
+            output += f"\n{interaction.guild.get_member(c[0]).display_name}"
             count += 1
         output += f"\n\t{c[1]} - {c[2]}"
         count += 1
         if count % 20 == 0:
             output += "```"
-            await ctx.send(output)
+            await interaction.followup.send(output)
             output = "```"
-    output += "```"
-    await ctx.send(output)
+        elif count == len(data) - 1:
+            output += "```"
+            await interaction.followup.send(output)
 
-@bot.command()
-async def getResources(ctx, pid):
-    data = await db.list_resources(pid, int(ctx.message.guild.id))
+@bot.tree.command(name = "get_resources", description = "Get a list of what resources are in this project")
+async def get_resources(interaction: discord.Interaction, project: int):
+    await interaction.response.defer()
+    data = await db.list_resources(project, interaction.guild_id)
     output = "```"
     count = 0
-    for c in data:
+    for r in data:
         output += f"\n{c[0] : <16} - {c[1] : >7} / {c[2] : >7}"
         count += 1
         if count % 20 == 0:
             output += "```"
-            await ctx.send(output)
+            await interaction.followup.send(output)
             output = "```"
-    output += "```"
-    await ctx.send(output)
+        elif count == len(data) - 1:
+            output += "```"
+            await interaction.followup.send(output)
 
-@bot.command()
-async def contribute(ctx, pid : int, amount : int, * , name : str):
-    await db.contribute_resources(pid, name, amount, ctx.author.id, int(ctx.message.guild.id))
-    await ctx.send(f"Thank you for your contribution! You contributed {amount} - {name} to project: {pid}")
+@bot.tree.command(name = "contribute", description = "Record your contributions to a project")
+async def contribute(interaction: discord.Interaction, project: int, resource: str, amount: int):
+    await db.contribute_resources(project, resource, amount, interaction.user.id, interaction.guild_id)
+    await interaction.response.send_message(f"Thank you for your contribution! You contributed {amount} - {resource} to project: {project}", ephemeral = True)
 
-@bot.command()
-async def finishProject(ctx, pid : int):
-    name = await db.complete_project(pid, ctx.message.guild.id)
-    await ctx.send(f"You have marked the project {name} - {pid} as complete!")
-
-with open('secrets', 'r') as sf:
-    token = sf.readline().strip()
+@bot.tree.command(name = "finish_project", description = "Finish a project, good job!")
+async def finishProject(interaction: discord.Interaction, project: int):
+    name = await db.complete_project(project, interaction.guild_id)
+    await interaction.response.send_message(f"You've marked project {name} - {project} as complete!")
 
 @tasks.loop(minutes=67)
 async def legion_advert():
@@ -331,19 +340,26 @@ async def legion_advert():
     await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
     print(f"Pinged {pinged.name} to advertise.")
 
+@tasks.loop(minutes = 1)
+async def ping_metronome():
+    h = bot.get_user(201804073886941185)
+    await h.send("HI METRONOME WE LOVE YOU")
+
 @tasks.loop(time=ANNOY_TIME)
 async def ticket_remind():
     humans = [m for m in LEGION_ID.members if (not m.bot and (TICKET_ROLE in m.roles))]
     for h in humans:
-        date_check = dt.datetime.now().replace(tzinfo=None) - h.joined_at.replace(tzinfo=None)
-        if date_check.days > 30:
+        date_check = dt.datetime.now().replace(tzinfo=ZoneInfo("America/Chicago")) - h.joined_at.replace(tzinfo=ZoneInfo("America/Chicago"))
+        if date_check.days > 7:
             await h.send(f"""
-                It looks like you've been in the Legion discord for over a month without making a ticket.
+                It looks like you've been in the Legion discord for over a week without making a ticket.
                 You have been automatically removed from the server to help maintain its cleanliness.
                 If you believe this was in error, please rejoin the server and make a ticket.
             """)
             await h.kick()
-        await h.send(f"""
+            print(f"Kicked {h.name} for inactivity in ticket.")
+        else:
+            await h.send(f"""
                      Hi! You joined The Legion discord server for Bitcraft, but seem to have not made a ticket.
                      Please head to this channel: https://discord.com/channels/1267584422253694996/1317666800896577638
                      and click the ***Create ticket*** button at the top of the channel in order to finish the process of joining The Legion.
@@ -360,7 +376,15 @@ async def synccmd(ctx: commands.Context):
         delete_after=1.0
     )
     await ctx.message.delete()
-    return
+
+@bot.command()
+async def globalsync(ctx: commands.Context):
+    fmt = await bot.tree.sync()
+    await ctx.send(
+        f"Synced {len(fmt)} commands globally",
+        delete_after = 5.0
+    )
+    await ctx.message.delete()
 
 @bot.tree.command(name="candidate", description="Declare yourself as a candidate for Senate.", guild=GUILD_ID)
 @app_commands.checks.has_role(1268739778119995505)
@@ -473,14 +497,35 @@ async def end_election(interaction: discord.Interaction, senator_count: int):
     save_state(STATE)
     sorted_candidates = sorted(candidates, key = lambda x: x.votes, reverse=True)
     output = ""
+
+    senate = interaction.guild.get_role(SENATOR_ROLE)
+    administrator = interaction.guild.get_role(ADMINISTRATOR_ROLE)
+
+    for m in interaction.guild.members:
+        try:
+            await m.remove_roles(senate, "Election Prep")
+            await m.remove_roles(administrator, "Election Prep")
+        except:
+            print("Removing senate and admin roles broke")
+
     if len(sorted_candidates) <= senator_count:
         for c in sorted_candidates:
             output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
+            m = interaction.guild.get_member(c.uid)
+            try:
+                await m.add_roles(senate, "Won Election")
+            except:
+                print("Adding senate roles broke")
     else:
         count = 1
         for c in sorted_candidates:
             if count <= senator_count:
                 output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
+                m = interaction.guild.get_member(c.uid)
+                try:
+                    await m.add_roles(senate, "Won Election")
+                except:
+                    print("Adding senate roles broke")
     await interaction.response.send_message(output, ephemeral=True)
     current_directory = os.getcwd()
     os.remove(f'{current_directory}\\candidates.p')
@@ -525,5 +570,8 @@ async def on_error(interaction: discord.Interaction, error: discord.app_commands
         await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
         return
     await interaction.response.send_message(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
+
+with open('secrets', 'r') as sf:
+    token = sf.readline().strip()
 
 bot.run(token)
