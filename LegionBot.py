@@ -7,7 +7,7 @@ import pickle
 import asyncio
 import database_sqlite
 import random
-import datetime as dt
+from datetime import datetime, time
 import candidate as cand
 import json
 import os
@@ -58,7 +58,7 @@ LEGION_ID = None
 ADVERTIZER_ROLE = None
 TICKET_ROLE = None
 STATE = None
-ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
+ANNOY_TIME = time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
 project_list = None
 votes = None
 candidates = None
@@ -332,9 +332,9 @@ async def finishProject(interaction: discord.Interaction, project: int):
 @tasks.loop(minutes=67)
 async def legion_advert():
     global STATE
-    if int(dt.datetime.now().timestamp()) - STATE['LAST_ANNOUNCE'] < 57600:
+    if int(datetime.now().timestamp()) - STATE['LAST_ANNOUNCE'] < 57600:
         return
-    STATE['LAST_ANNOUNCE'] = int(dt.datetime.now().timestamp())
+    STATE['LAST_ANNOUNCE'] = int(datetime.now().timestamp())
     save_state(STATE)
     humans = [m for m in LEGION_ID.members if (not m.bot and (ADVERTIZER_ROLE in m.roles))]
     pinged = random.choice(humans)
@@ -350,7 +350,7 @@ async def ping_metronome():
 async def ticket_remind():
     humans = [m for m in LEGION_ID.members if (not m.bot and (TICKET_ROLE in m.roles))]
     for h in humans:
-        date_check = dt.datetime.now().replace(tzinfo=ZoneInfo("America/Chicago")) - h.joined_at.replace(tzinfo=ZoneInfo("America/Chicago"))
+        date_check = datetime.now().replace(tzinfo=ZoneInfo("America/Chicago")) - h.joined_at.replace(tzinfo=ZoneInfo("America/Chicago"))
         if date_check.days > 7:
             await h.send(f"""
                 It looks like you've been in the Legion discord for over a week without making a ticket.
@@ -403,7 +403,7 @@ async def candidate(interaction: discord.Interaction):
 
     # Check user join date
     data = await db.get_user(interaction.user.id)
-    date_check = dt.datetime.now().replace(tzinfo=None) - dt.datetime.fromtimestamp(data[2])
+    date_check = datetime.now().replace(tzinfo=None) - datetime.fromtimestamp(data[2])
     print(date_check.days)
     if date_check.days < 30:
         await interaction.response.send_message("You haven't been here long enough! You need to have been in the guild for at least one month to be a Senator!", ephemeral=True)
@@ -575,7 +575,7 @@ async def count_professions(interaction: discord.Interaction):
 @bot.tree.command(name = "add_member", description = "Add a member as part of Legion", guild = GUILD_ID)
 @app_commands.checks.has_role(1311824922301038632)
 async def add_member(interaction: discord.Interaction, user: discord.Member):
-    data = await db.new_user(user.id, user.joined_at.timestamp(), dt.datetime.now().timestamp())
+    data = await db.new_user(user.id, user.joined_at.timestamp(), datetime.now().timestamp())
     output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
     await interaction.response.send_message(output, ephemeral = True)
 
