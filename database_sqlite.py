@@ -63,7 +63,7 @@ class DatabaseSqlite(database.Database):
                 contributor_id INTEGER,
                 amount INTEGER NOT NULL,
                 PRIMARY KEY(resource_id, contributor_id),
-                FOREIGN KEY(resource_id) REFERENCES resoruces(resource_id),
+                FOREIGN KEY(resource_id) REFERENCES resources(resource_id),
                 FOREIGN KEY(contributor_id) REFERENCES contributors(contributor_id)
             );
             """
@@ -79,6 +79,16 @@ class DatabaseSqlite(database.Database):
                 completed BOOL NOT NULL
             );
             """
+        )
+
+        self.db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            join_date INTEGER NOT NULL,
+            member_date INTEGER NOT NULL
+        );
+        """
         )
 
     async def insert_request(self, server_id : int, requestor_id : int, resource_message : str) -> int:
@@ -189,7 +199,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT * FROM REQUESTS
-                WHERE not filled AND server_id = {server_id};
+                WHERE NOT filled AND server_id = {server_id};
             """)
             data = res.fetchall()
             cursor.close()
@@ -331,8 +341,9 @@ class DatabaseSqlite(database.Database):
             if servcheck == server_id:
                 res = cursor.execute(f"""
                 SELECT resources.name, COALESCE(SUM(contributions.amount), 0), total_amount
-                FROM projects JOIN resources ON projects.project_id = resources.project_id
+                FROM projects JOIN resources ON {pid} = resources.project_id
                 LEFT JOIN contributions ON resources.resource_id = contributions.resource_id
+                WHERE projects.project_id == {pid}
                 GROUP BY resources.name, resources.resource_id, total_amount
                 ORDER BY resources.name, total_amount;
             """)
@@ -358,7 +369,7 @@ class DatabaseSqlite(database.Database):
                     ON CONFLICT DO NOTHING;
                 """)
                 rid = cursor.execute(f"""
-                    SELECT resource_id FROM resources WHERE name = '{sanitize(name)}' and project_id = {pid}
+                    SELECT resource_id FROM resources WHERE name = '{sanitize(name)}' AND project_id = {pid}
                 """).fetchone()[0]
                 res = cursor.execute(f"""
                     INSERT INTO contributions
@@ -367,7 +378,7 @@ class DatabaseSqlite(database.Database):
                     ON CONFLICT (contributor_id, resource_id) DO
                     UPDATE
                     SET amount = amount + {amount}
-                    WHERE contributor_id = {uid} AND resource_id = {rid} AND not completed;
+                    WHERE contributor_id = {uid} AND resource_id = {rid};
                 """)
             self.db.commit()
             cursor.close()
@@ -390,6 +401,58 @@ class DatabaseSqlite(database.Database):
         finally:
             self.lock.release()
         return data[0]
+
+    async def new_user(self, uid: int, join_date: int, member_date: int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                INSERT INTO users
+                (user_id, join_date, member_date)
+                VALUES ({uid}, {join_date}, {member_date})
+                ON CONFLICT (user_id) DO
+                UPDATE
+                SET join_date = {join_date}, member_date = {member_date}
+                WHERE user_id = {uid}
+                RETURNING *;
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def remove_user(self, uid: int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                DELETE FROM users
+                WHERE user_id = {uid}
+                RETURNING *;
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def get_user(self, uid: int):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+            SELECT * FROM users
+            WHERE user_id = {uid};
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
 
 def convertTuple(args):
     if args != None:

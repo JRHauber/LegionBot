@@ -115,7 +115,7 @@ async def on_member_join(member):
 
 @bot.tree.command(name = "request_list", description = "Get a list of open requests")
 async def request_list(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await interaction.response.send_message("Fetching Requests...", ephemeral = True)
     output = "```"
     namePadding = 0
     requestPadding = 0
@@ -143,20 +143,20 @@ async def request_list(interaction: discord.Interaction):
             claim_name = "Unclaimed"
         else:
             claim_name = interaction.guild.get_member(r.claimant_id).display_name
-        if len(r.resource > 40):
+        if len(r.resource) > 40:
             resource = r.resource[0:40]
             resource += "..."
         else:
             resource = r.resource
         user_name = interaction.guild.get_member(r.requestor_id).display_name
-        output += f"\n {user_name: < {namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
+        output += f"\n {user_name: <{namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
         count += 1
 
         if count % 10 == 0:
             output += "```"
             await interaction.followup.send(output)
             output = "```"
-        elif count == len(data) - 1:
+        elif count == len(data):
             output += "```"
             await interaction.followup.send(output)
 
@@ -174,10 +174,10 @@ async def claim(interaction: discord.Interaction, id: int):
     currentRequest = await db.claim_request(id, interaction.guild_id, interaction.user.id)
 
     if currentRequest == None:
-        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
+        await interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
         return
 
-    interaction.response.send_message(f"""
+    await interaction.response.send_message(f"""
     <@{currentRequest.requestor_id}>
         Claimant: {interaction.user.display_name.capitalize()}
         Resource: {currentRequest.resource}
@@ -189,21 +189,21 @@ async def unclaim(interaction: discord.Interaction, id: int):
     currentRequest = await db.unclaim_request(id, interaction.guild_id, interaction.user.id)
 
     if currentRequest == None:
-        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
+        await interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
         return
 
     interaction.response.send_message(f"You have successfully unclaimed {currentRequest.resource} ({id})", ephemeral=True)
 
 @bot.tree.command(name = "complete", description = "Complete a request")
 async def complete(interaction: discord.Interaction, id: int):
-    currentRequest = await db.claim_request(id, interaction.guild_id, interaction.user.id)
+    currentRequest = await db.finish_request(id, interaction.guild_id, interaction.user.id)
 
     if currentRequest == None:
-        interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
+        await interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
         return
 
     await interaction.response.send_message(f"""
-    <@{currentRequest.requestor_id}>the
+    <@{currentRequest.requestor_id}>
         Completer: {interaction.user.display_name.capitalize()}
         Resource: {currentRequest.resource}
         ID: {id}
@@ -217,7 +217,7 @@ async def claims(interaction: discord.Interaction):
     for d in data:
         user_name = interaction.guild.get_member(d.requestor_id).display_name
         out += f" {d.id} - {user_name.capitalize()} - {d.resource}\n"
-    interaction.response.send_message(f"{interaction.user.display_name}'s requests: \n {out}", ephemeral = True)
+    await interaction.response.send_message(f"{interaction.user.display_name}'s requests: \n {out}", ephemeral = True)
 
 @bot.tree.command(name = "requests", description = "See a list of requests you've made")
 async def requests(interaction: discord.Interaction):
@@ -248,7 +248,7 @@ async def remove_resource(interaction: discord.Interaction, resource: str, proje
 
 @bot.tree.command(name = "list_projects", description = "Display a list of active project")
 async def list_projects(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await interaction.response.send_message("Fetching Project List...", ephemeral=True)
     data = await db.list_projects(interaction.guild_id)
     output = "```"
     count = 0
@@ -259,12 +259,13 @@ async def list_projects(interaction: discord.Interaction):
             output += "```"
             await interaction.followup.send(output)
             output = "```"
-        elif count == len(data) - 1:
+        elif count == len(data):
             output += "```"
             await interaction.followup.send(output)
 
 @bot.tree.command(name = "get_contributors", description = "Get a list of people who have contributed to this project")
 async def get_contributors(interaction: discord.Interaction, project: int):
+    await interaction.response.send_message("Fetching Contributors...", ephemeral=True)
     data = await db.list_contributors(project, interaction.guild_id)
     output = "```"
     count = 0
@@ -275,13 +276,13 @@ async def get_contributors(interaction: discord.Interaction, project: int):
             output += "```"
             await interaction.followup.send(output)
             output = "```"
-        elif count == len(data) - 1:
+        elif count == len(data):
             output += "```"
             await interaction.followup.send(output)
 
 @bot.tree.command(name = "get_contributions", description = "Get a list of what resources members have been contributed to this project")
 async def get_contributions(interaction: discord.Interaction, project: int):
-    await interaction.response.defer()
+    await interaction.response.send_message("Fetching Contributions...", ephemeral=True)
     data = await db.list_contributions(project, interaction.guild_id)
     output = "```"
     count = 0
@@ -297,24 +298,24 @@ async def get_contributions(interaction: discord.Interaction, project: int):
             output += "```"
             await interaction.followup.send(output)
             output = "```"
-        elif count == len(data) - 1:
+        elif count >= len(data):
             output += "```"
             await interaction.followup.send(output)
 
 @bot.tree.command(name = "get_resources", description = "Get a list of what resources are in this project")
 async def get_resources(interaction: discord.Interaction, project: int):
-    await interaction.response.defer()
+    await interaction.response.send_message("Fetching Resources...", ephemeral=True)
     data = await db.list_resources(project, interaction.guild_id)
     output = "```"
     count = 0
     for r in data:
-        output += f"\n{c[0] : <16} - {c[1] : >7} / {c[2] : >7}"
+        output += f"\n{r[0] : <16} - {r[1] : >7} / {r[2] : >7}"
         count += 1
         if count % 20 == 0:
             output += "```"
             await interaction.followup.send(output)
             output = "```"
-        elif count == len(data) - 1:
+        elif count == len(data):
             output += "```"
             await interaction.followup.send(output)
 
@@ -401,7 +402,8 @@ async def candidate(interaction: discord.Interaction):
             return
 
     # Check user join date
-    date_check = dt.datetime.now().replace(tzinfo=None) - interaction.user.joined_at.replace(tzinfo=None)
+    data = await db.get_user(interaction.user.id)
+    date_check = dt.datetime.now().replace(tzinfo=None) - dt.datetime.fromtimestamp(data[2])
     print(date_check.days)
     if date_check.days < 30:
         await interaction.response.send_message("You haven't been here long enough! You need to have been in the guild for at least one month to be a Senator!", ephemeral=True)
@@ -547,19 +549,49 @@ profession_roles = {
 
 @bot.tree.command(name = "count_professions", description = "Display a count of member professions", guild = GUILD_ID)
 async def count_professions(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await interaction.response.send_message("Getting profession counts", ephemeral=True)
     output = '```'
+    rcount = 0
     for k, v in profession_roles.items():
         count = 0
+        rcount += 1
         role = interaction.guild.get_role(v)
+        output += f"{k.title():14} -"
         for m in role.members:
             if interaction.guild.get_role(1268739778119995505) in m.roles:
+                output += f" {m.display_name},"
                 count += 1
-        output += f"{k:<14} - ({count})\n"
-    output[:-2]
-    output += "```"
-    await interaction.followup.send(output, ephemeral=True)
+        output = output[:-1]
+        output += f" - ({count})\n\n"
+        if rcount %4 == 0:
+            output += "```"
+            await interaction.followup.send(output)
+            output = "```"
+        elif rcount == len(profession_roles):
+            output += "```"
+            await interaction.followup.send(output)
     return
+
+@bot.tree.command(name = "add_member", description = "Add a member as part of Legion", guild = GUILD_ID)
+@app_commands.checks.has_role(1311824922301038632)
+async def add_member(interaction: discord.Interaction, user: discord.Member):
+    data = await db.new_user(user.id, user.joined_at.timestamp(), dt.datetime.now().timestamp())
+    output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
+    await interaction.response.send_message(output, ephemeral = True)
+
+@bot.tree.command(name = "remove_member", description = "Remove a member as part of Legion", guild = GUILD_ID)
+@app_commands.checks.has_role(1311824922301038632)
+async def remove_member(interaction: discord.Interaction, user: discord.Member):
+    data = await db.remove_user(user.id)
+    output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
+    await interaction.response.send_message(output, ephemeral = True)
+
+@bot.tree.command(name = "get_member", description = "Get user data", guild = GUILD_ID)
+@app_commands.checks.has_role(1311824922301038632)
+async def get_member(interaction: discord.Interaction, user: discord.Member):
+    data = await db.remove_user(user.id)
+    output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
+    await interaction.response.send_message(output, ephemeral = True)
 
 @bot.tree.error
 async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
@@ -569,7 +601,7 @@ async def on_error(interaction: discord.Interaction, error: discord.app_commands
     if isinstance(error, discord.app_commands.MissingRole):
         await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
         return
-    await interaction.response.send_message(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
+    await interaction.followup.send(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()

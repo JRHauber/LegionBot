@@ -32,7 +32,7 @@ class Database():
     async def add_resource(self, resource : str, count : int, pid : int, server_id : int):
         raise NotImplementedError()
 
-    async def add_resource(self, resourc : str, pid : int, server_id : int):
+    async def add_resource(self, resource : str, pid : int, server_id : int):
         raise NotImplementedError()
 
     async def list_projects(self, server_id : int):
@@ -51,4 +51,13 @@ class Database():
         raise NotImplementedError()
 
     async def complete_project(self, pid : int, server_id : int):
+        raise NotImplementedError()
+
+    async def new_user(self, uid: int, join_date: int, member_date: int):
+        raise NotImplementedError()
+
+    async def remove_user(self, uid: int):
+        raise NotImplementedError()
+
+    async def get_user(self, uid: int):
         raise NotImplementedError()
