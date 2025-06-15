@@ -621,18 +621,18 @@ async def get_member(interaction: discord.Interaction, user: discord.Member):
     output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
     await interaction.response.send_message(output, ephemeral = True)
 
-#@bot.tree.error
-#async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
-#    if isinstance(error, discord.app_commands.MissingPermissions):
-#        await interaction.response.send_message("Sorry, you don't have the permissions to run that command.", ephemeral=True)
-#        return
-#    if isinstance(error, discord.app_commands.MissingRole):
-#        await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
-#        return
-#    if isinstance(error, discord.errors.Forbidden):
-#        print("Forbidden error. Probably a failed DM.")
-#        return
-#    await interaction.followup.send(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
+@bot.tree.error
+async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+    if isinstance(error, discord.app_commands.MissingPermissions):
+        await interaction.response.send_message("Sorry, you don't have the permissions to run that command.", ephemeral=True)
+        return
+    if isinstance(error, discord.app_commands.MissingRole):
+        await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
+        return
+    if isinstance(error, discord.errors.Forbidden):
+        print("Forbidden error. Probably a failed DM.")
+        return
+    await interaction.followup.send(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
