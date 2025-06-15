@@ -7,7 +7,8 @@ import pickle
 import asyncio
 import database_sqlite
 import random
-from datetime import datetime, time
+from datetime import datetime
+import datetime as dt
 import candidate as cand
 import json
 import os
@@ -58,7 +59,7 @@ LEGION_ID = None
 ADVERTIZER_ROLE = None
 TICKET_ROLE = None
 STATE = None
-ANNOY_TIME = time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
+ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
 project_list = None
 votes = None
 candidates = None
@@ -112,6 +113,21 @@ async def on_member_join(member):
     https://discordapp.com/channels/1267584422253694996/1317666800896577638/1317673462495711322
     """)
     print(f"Pinged {member.name} with join info")
+
+@bot.event
+async def on_member_update(before, after):
+    legionnaire = LEGION_ID.get_role(1268739778119995505)
+    federati = LEGION_ID.get_role(1383132329270054984)
+    citizen = LEGION_ID.get_role(1383132292444197140)
+    if legionnaire in after.roles and not legionnaire in before.roles:
+        data = await db.new_user(after.id, after.joined_at.timestamp(), datetime.now().timestamp())
+        await after.add_roles(citizen)
+        print(data)
+    if federati in after.roles and not federati in before.roles:
+        data = await db.new_user(after.id, after.joined_at.timestamp(), datetime.now().timestamp())
+        await after.add_roles(citizen)
+        print(data)
+    return
 
 @bot.tree.command(name = "request_list", description = "Get a list of open requests")
 async def request_list(interaction: discord.Interaction):
@@ -352,11 +368,14 @@ async def ticket_remind():
     for h in humans:
         date_check = datetime.now().replace(tzinfo=ZoneInfo("America/Chicago")) - h.joined_at.replace(tzinfo=ZoneInfo("America/Chicago"))
         if date_check.days > 7:
-            await h.send(f"""
+            try:
+                await h.send(f"""
                 It looks like you've been in the Legion discord for over a week without making a ticket.
                 You have been automatically removed from the server to help maintain its cleanliness.
                 If you believe this was in error, please rejoin the server and make a ticket.
-            """)
+                """)
+            except:
+                print(f"Couldn't send kick message to {h.display_name}")
             await h.kick()
             print(f"Kicked {h.name} for inactivity in ticket.")
         else:
@@ -367,7 +386,7 @@ async def ticket_remind():
                      \n If you've already made a ticket, please make sure to read the questions in that channel and answer them in your created ticket.
                      \n Thank you for your cooperation :)
                      """)
-        print(f"Pinged {h.name} to make a ticket.")
+            print(f"Pinged {h.name} to make a ticket.")
 
 @bot.command()
 async def synccmd(ctx: commands.Context):
@@ -404,7 +423,6 @@ async def candidate(interaction: discord.Interaction):
     # Check user join date
     data = await db.get_user(interaction.user.id)
     date_check = datetime.now().replace(tzinfo=None) - datetime.fromtimestamp(data[2])
-    print(date_check.days)
     if date_check.days < 30:
         await interaction.response.send_message("You haven't been here long enough! You need to have been in the guild for at least one month to be a Senator!", ephemeral=True)
         return
@@ -420,6 +438,11 @@ async def candidate(interaction: discord.Interaction):
             await interaction.response.send_message("It looks like you're already a candidate, no need to put yourself in twice!", ephemeral=True)
             return
 
+    # Check if user is Vigiles
+    if interaction.guild.get_role(1382057254039064869) in interaction.user.roles:
+        await interaction.response.send_message("Sorry, you are a Vigil and are thus not eligible for senate", ephemeral=True)
+        return
+
     max_id = 0
     for x in candidates:
         if x.cid > max_id:
@@ -427,6 +450,7 @@ async def candidate(interaction: discord.Interaction):
     max_id += 1
     c = cand.Candidate(interaction.user.name, interaction.user.id, max_id)
     candidates.append(c)
+    print(f"{interaction.user.display_name} declared themselves a Candidate")
     await interaction.response.send_message(f"""
     Thank you for submitting your candidacy for the Legion Senate, your details are as follows:
     Name: {c.name}
@@ -456,7 +480,7 @@ async def start_voting(interaction: discord.Interaction):
 @app_commands.checks.has_role(1268739778119995505)
 async def withdraw(interaction: discord.Interaction):
     for c in candidates:
-        if c.uid == interaction.member.id:
+        if c.uid == interaction.user.id:
             candidates.remove(c)
             pickle.dump(candidates, open("candidates.p", "wb"))
             await interaction.response.send_message("You have removed yourself as a candidate", ephemeral = True)
@@ -488,6 +512,8 @@ async def list_candidates(interaction: discord.Interaction):
     output = ""
     for c in candidates:
         output += f'{c.name} - {c.cid}\n'
+    if candidates == []:
+        output = "There's not an election going on or no one has declared themselves a candidate yet."
     await interaction.response.send_message(output, ephemeral=True)
 
 
@@ -497,40 +523,42 @@ async def end_election(interaction: discord.Interaction, senator_count: int):
     global STATE
     STATE['ELECTION_STARTED'] = False
     save_state(STATE)
-    sorted_candidates = sorted(candidates, key = lambda x: x.votes, reverse=True)
     output = ""
 
     senate = interaction.guild.get_role(SENATOR_ROLE)
     administrator = interaction.guild.get_role(ADMINISTRATOR_ROLE)
 
+    sorted_candidates = sorted(candidates, key = lambda x: x.votes)
+
+    await interaction.response.send_message("Tallying the votes!", delete_after=120)
+
     for m in interaction.guild.members:
-        try:
-            await m.remove_roles(senate, "Election Prep")
-            await m.remove_roles(administrator, "Election Prep")
-        except:
-            print("Removing senate and admin roles broke")
+        if senate in m.roles:
+            await m.remove_roles(senate)
+            print(f"Removed senator role from: {m.display_name}")
+        if administrator in m.roles:
+            await m.remove_roles(administrator)
+            print(f"Removed administrator role from: {m.display_name}")
 
     if len(sorted_candidates) <= senator_count:
         for c in sorted_candidates:
             output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
             m = interaction.guild.get_member(c.uid)
-            try:
-                await m.add_roles(senate, "Won Election")
-            except:
-                print("Adding senate roles broke")
+            print(m.display_name)
+            print(output)
+
+            await m.add_roles(senate)
     else:
         count = 1
         for c in sorted_candidates:
             if count <= senator_count:
                 output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
                 m = interaction.guild.get_member(c.uid)
-                try:
-                    await m.add_roles(senate, "Won Election")
-                except:
-                    print("Adding senate roles broke")
-    await interaction.response.send_message(output, ephemeral=True)
-    current_directory = os.getcwd()
-    os.remove(f'{current_directory}\\candidates.p')
+                await m.add_roles(senate)
+
+    await interaction.followup.send(output)
+    candidates = []
+    pickle.dump(candidates, open("candidates.p", "wb"))
 
 profession_roles = {
     "foraging": 1267585190981796021,
@@ -593,15 +621,18 @@ async def get_member(interaction: discord.Interaction, user: discord.Member):
     output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
     await interaction.response.send_message(output, ephemeral = True)
 
-@bot.tree.error
-async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
-    if isinstance(error, discord.app_commands.MissingPermissions):
-        await interaction.response.send_message("Sorry, you don't have the permissions to run that command.", ephemeral=True)
-        return
-    if isinstance(error, discord.app_commands.MissingRole):
-        await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
-        return
-    await interaction.followup.send(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
+#@bot.tree.error
+#async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+#    if isinstance(error, discord.app_commands.MissingPermissions):
+#        await interaction.response.send_message("Sorry, you don't have the permissions to run that command.", ephemeral=True)
+#        return
+#    if isinstance(error, discord.app_commands.MissingRole):
+#        await interaction.response.send_message("Sorry, you don't have the right role to run that command", ephemeral=True)
+#        return
+#    if isinstance(error, discord.errors.Forbidden):
+#        print("Forbidden error. Probably a failed DM.")
+#        return
+#    await interaction.followup.send(f"The bot has thrown the following error: {error}. Please contact Lanidae and send a screenshot of this message.", ephemeral=True)
 
 with open('secrets', 'r') as sf:
     token = sf.readline().strip()
