@@ -86,6 +86,10 @@ async def on_ready():
     load_pickle_files()
     #ping_metronome.start()
 
+@bot.event
+async def on_message(message: discord.Message):
+    if message.guild.get_role(1268739778119995505) in message.author.roles:
+        db.change_user_activity("TRUE", message.author.id)
 
 @bot.event
 async def on_guild_channel_create(channel):
@@ -104,7 +108,7 @@ async def on_guild_channel_create(channel):
                            """)
 
 @bot.event
-async def on_member_join(member):
+async def on_member_join(member: discord.Member):
     await asyncio.sleep(30)
     await member.send("""
     Hello! Thank you for joining the discord server for The Legion, our group for Bitcraft Online.
@@ -115,7 +119,7 @@ async def on_member_join(member):
     print(f"Pinged {member.name} with join info")
 
 @bot.event
-async def on_member_update(before, after):
+async def on_member_update(before: discord.Member, after: discord.Member):
     legionnaire = LEGION_ID.get_role(1268739778119995505)
     federati = LEGION_ID.get_role(1383132329270054984)
     citizen = LEGION_ID.get_role(1383132292444197140)
@@ -620,6 +624,43 @@ async def get_member(interaction: discord.Interaction, user: discord.Member):
     data = await db.remove_user(user.id)
     output = f"Name: {interaction.guild.get_member(data[0]).display_name} - Join Date: <t:{int(data[1])}> - Member Date: <t:{int(data[2])}>"
     await interaction.response.send_message(output, ephemeral = True)
+
+@bot.tree.command(name = "active_check", description = "This will REALLY slow the bot down. Don't run it often.", guild = GUILD_ID)
+@app_commands.checks.has_role(1311824922301038632)
+async def active_check(interaction: discord.Interaction, months: int):
+    await interaction.response.send_message("Calculating active members, this might take a while")
+    two_months = datetime.now().timestamp() - 2628288 * months
+    two_months = datetime.fromtimestamp(two_months)
+    active_members = {}
+
+    async for message in interaction.guild.get_channel(1304830655921651722).history(limit = None, after = two_months):
+        if not message.author.bot and interaction.guild.get_member(message.author.id):
+            if interaction.guild.get_role(1268739778119995505) in message.author.roles:
+                active_members[message.author.id] = message.author.name
+
+    print("done with legion-chat")
+
+    async for message in interaction.guild.get_channel(1267584422253694999).history(limit = None, after = two_months):
+        if not message.author.bot and interaction.guild.get_member(message.author.id):
+            if interaction.guild.get_role(1268739778119995505) in message.author.roles:
+                active_members[message.author.id] = message.author.name
+
+    print("done with general-chat")
+
+    active_count = len(active_members)
+    output = ""
+    for v in active_members.values():
+        output += f"{v}, "
+    output += f"({active_count})"
+
+    for m in interaction.guild.members:
+        if interaction.guild.get_role(1268739778119995505) in m.roles:
+            if m.id in active_members.keys():
+                await db.change_user_activity("TRUE", m.id)
+            else:
+                await db.change_user_activity("FALSE", m.id)
+
+    await interaction.followup.send(f"```{output}```")
 
 @bot.tree.error
 async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:

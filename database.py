@@ -61,3 +61,6 @@ class Database():
 
     async def get_user(self, uid: int):
         raise NotImplementedError()
+
+    async def change_user_activity(self, status: str, uid: int):
+        raise NotImplementedError()

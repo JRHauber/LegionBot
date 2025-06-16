@@ -76,7 +76,7 @@ class DatabaseSqlite(database.Database):
                 server_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 time INTEGER NOT NULL,
-                completed BOOL NOT NULL
+                completed BOOL DEFAULT FALSE
             );
             """
         )
@@ -86,7 +86,8 @@ class DatabaseSqlite(database.Database):
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             join_date INTEGER NOT NULL,
-            member_date INTEGER NOT NULL
+            member_date INTEGER NOT NULL,
+            active BOOL NOT NULL
         );
         """
         )
@@ -454,6 +455,19 @@ class DatabaseSqlite(database.Database):
             self.lock.release()
         return data
 
+    async def change_user_activity(self, status, uid):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+            UPDATE users
+            SET active = {status}
+            WHERE user_id = {uid};
+            """)
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
 def convertTuple(args):
     if args != None:
         return resource_requests.resourceRequest(*args)
