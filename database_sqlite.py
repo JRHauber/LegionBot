@@ -468,6 +468,37 @@ class DatabaseSqlite(database.Database):
             cursor.close()
         finally:
             self.lock.release()
+
+    async def user_recent_message(self, message_time, uid):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"""
+                UPDATE users
+                SET last_message = {message_time}
+                WHERE user_id = {uid};
+            """)
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+
+    async def get_user_activity(self, uid):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+            SELECT active, last_message
+            FROM users
+            WHERE user_id = {uid};
+            """)
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
 def convertTuple(args):
     if args != None:
         return resource_requests.resourceRequest(*args)

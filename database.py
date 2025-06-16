@@ -64,3 +64,9 @@ class Database():
 
     async def change_user_activity(self, status: str, uid: int):
         raise NotImplementedError()
+
+    async def user_recent_message(self, message_time: int, uid: int):
+        raise NotImplementedError()
+
+    async def get_user_activity(self, uid: int):
+        raise NotImplementedError()

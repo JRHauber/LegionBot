@@ -60,6 +60,7 @@ ADVERTIZER_ROLE = None
 TICKET_ROLE = None
 STATE = None
 ANNOY_TIME = dt.time(hour = 0, minute = 0, second = 0, tzinfo=ZoneInfo("America/Chicago"))
+ACTIVITY_CHECK_START = dt.datetime(2025, 6, 15, 0, 0, 0, 0, ZoneInfo("America/Chicago"))
 project_list = None
 votes = None
 candidates = None
@@ -89,7 +90,8 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     if message.guild.get_role(1268739778119995505) in message.author.roles:
-        db.change_user_activity("TRUE", message.author.id)
+        await db.change_user_activity("TRUE", message.author.id)
+        await db.user_recent_message(message.created_at.timestamp(), message.author.id)
 
 @bot.event
 async def on_guild_channel_create(channel):
@@ -391,6 +393,29 @@ async def ticket_remind():
                      \n Thank you for your cooperation :)
                      """)
             print(f"Pinged {h.name} to make a ticket.")
+
+@tasks.loop(time=ANNOY_TIME)
+async def activity_update():
+    humans = [m for m in LEGION_ID.members if (not m.bot and LEGION_ID.get_role(1268739778119995505)())]
+
+    for h in humans:
+        data = await db.get_user_activity(h.id)
+
+        #Grace Period Check
+        if (datetime.now() < ACTIVITY_CHECK_START + dt.timedelta(days = 30)) and data[1] == 0:
+            return
+
+        #Check if they've talked since the Grace Period ended
+        if data[1] == 0:
+            await db.change_user_activity("FALSE", h.id)
+            return
+
+        time_difference = datetime.now() - datetime.fromtimestamp(data[1])
+
+        if time_difference.days > 30:
+            await db.change_user_activity("FALSE", h.id)
+            return
+
 
 @bot.command()
 async def synccmd(ctx: commands.Context):
