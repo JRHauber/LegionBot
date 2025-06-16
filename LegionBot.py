@@ -89,9 +89,12 @@ async def on_ready():
 
 @bot.event
 async def on_message(message: discord.Message):
-    if message.guild.get_role(1268739778119995505) in message.author.roles:
-        await db.change_user_activity("TRUE", message.author.id)
-        await db.user_recent_message(message.created_at.timestamp(), message.author.id)
+    if not message.author.bot:
+        if message.guild.get_role(1268739778119995505) in message.author.roles:
+            await db.change_user_activity("TRUE", message.author.id)
+            await db.user_recent_message(message.created_at.timestamp(), message.author.id)
+
+    await bot.process_commands(message)
 
 @bot.event
 async def on_guild_channel_create(channel):
@@ -678,6 +681,8 @@ async def active_check(interaction: discord.Interaction, months: int):
         output += f"{v}, "
     output += f"({active_count})"
 
+    await interaction.followup.send(f"```{output}```")
+
     for m in interaction.guild.members:
         if interaction.guild.get_role(1268739778119995505) in m.roles:
             if m.id in active_members.keys():
@@ -685,7 +690,18 @@ async def active_check(interaction: discord.Interaction, months: int):
             else:
                 await db.change_user_activity("FALSE", m.id)
 
-    await interaction.followup.send(f"```{output}```")
+@bot.tree.command(name="basic_active_check", description = "activity check that relies on passive tracking", guild = GUILD_ID)
+async def basic_active_check(interaction: discord.Interaction):
+    await interaction.response.send_message("Looking up active members, just a second.", ephemeral=True)
+    humans = [m for m in LEGION_ID.members if (not m.bot and (interaction.guild.get_role(1268739778119995505) in m.roles))]
+
+    count = 0
+    for h in humans:
+        data = await db.get_user_activity(h.id)
+        if data[0] == 1:
+            count += 1
+
+    await interaction.followup.send(f"There are {count} active users.", ephemeral=True)
 
 @bot.tree.error
 async def on_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:

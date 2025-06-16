@@ -488,7 +488,7 @@ class DatabaseSqlite(database.Database):
         try:
             cursor = self.db.cursor()
             res = cursor.execute(f"""
-            SELECT active, last_message
+            SELECT active, last_message, user_id
             FROM users
             WHERE user_id = {uid};
             """)
