@@ -27,7 +27,8 @@ class DatabaseSqlite(database.Database):
                 filled BOOL NOT NULL,
                 requestor_id INTEGER NOT NULL,
                 claimant_id INTEGER,
-                resource_message VARCHAR(20) NOT NULL
+                resource_message VARCHAR(20) NOT NULL,
+                created_at INTEGER NOT NULL
             );
             """
         )
@@ -92,14 +93,14 @@ class DatabaseSqlite(database.Database):
         """
         )
 
-    async def insert_request(self, server_id : int, requestor_id : int, resource_message : str) -> int:
+    async def insert_request(self, server_id : int, requestor_id : int, resource_message : str, created_at: int) -> int:
         await self.lock.acquire()
         try:
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 INSERT INTO requests
-                (server_id, requestor_id, resource_message, filled)
-                VALUES ({server_id}, {requestor_id}, "{sanitize(resource_message)}", FALSE)
+                (server_id, requestor_id, resource_message, filled, created_at)
+                VALUES ({server_id}, {requestor_id}, "{sanitize(resource_message)}", FALSE, {created_at})
                 RETURNING id;
                 """
             )
@@ -141,6 +142,37 @@ class DatabaseSqlite(database.Database):
                 RETURNING *;
                 """
             )
+            data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return convertTuple(data)
+
+    async def purge_old_requests(self, server_id, request_id):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                UPDATE requests
+                SET filled = 1
+                WHERE id = {request_id} AND server_id = {server_id};
+            """)
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+
+    async def cancel_request(self, server_id, request_id):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+            UPDATE requests
+            SET filled = 1
+            WHERE id = {request_id} AND server_id = {server_id}
+            RETURNING *;
+            """)
             data = res.fetchone()
             self.db.commit()
             cursor.close()
@@ -493,6 +525,21 @@ class DatabaseSqlite(database.Database):
             WHERE user_id = {uid};
             """)
             data = res.fetchone()
+            self.db.commit()
+            cursor.close()
+        finally:
+            self.lock.release()
+        return data
+
+    async def get_all_users(self):
+        await self.lock.acquire()
+        try:
+            cursor = self.db.cursor()
+            res = cursor.execute(f"""
+                SELECT user_id
+                FROM users;
+            """)
+            data = res.fetchall()
             self.db.commit()
             cursor.close()
         finally:

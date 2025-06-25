@@ -5,7 +5,7 @@ class Database():
     def setup_db(self):
         raise NotImplementedError()
 
-    async def insert_request(self, server_id : int, requester_id : int, resource_message : str) -> int:
+    async def insert_request(self, server_id : int, requester_id : int, resource_message : str, created_at: int) -> int:
         raise NotImplementedError()
 
     async def claim_request(self, id : int, server_id : int, claimant_id : int):
@@ -69,4 +69,13 @@ class Database():
         raise NotImplementedError()
 
     async def get_user_activity(self, uid: int):
+        raise NotImplementedError()
+
+    async def get_all_users(self):
+        raise NotImplementedError()
+
+    async def purge_old_requests(self, server_id: int, request_id: int):
+        raise NotImplementedError()
+
+    async def cancel_request(self, server_id: int, request_id: int):
         raise NotImplementedError()

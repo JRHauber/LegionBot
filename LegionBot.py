@@ -85,7 +85,6 @@ async def on_ready():
     legion_advert.start()
     ticket_remind.start()
     load_pickle_files()
-    #ping_metronome.start()
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -109,17 +108,19 @@ async def on_guild_channel_create(channel):
         5) Are you currently a member of any other group?
         6) What is your primary (and secondary if applicable) language?
         7) What made you interested in joining The Legion? Were you invited by anyone?
-
                            """)
 
 @bot.event
 async def on_member_join(member: discord.Member):
-    await asyncio.sleep(30)
-    await member.send("""
+    await asyncio.sleep(45)
+    channel = LEGION_ID.get_channel(1373730490871185508)
+    await member.add_roles(member.guild.get_role(1324782094571798621))
+    await channel.send(f"""
     Hello! Thank you for joining the discord server for The Legion, our group for Bitcraft Online.
     Please make sure you head to this message in the welcome channel and click the button to create a ticket.
     This will allow you to access the rest of the server.
     https://discordapp.com/channels/1267584422253694996/1317666800896577638/1317673462495711322
+    {member.mention}
     """)
     print(f"Pinged {member.name} with join info")
 
@@ -136,6 +137,14 @@ async def on_member_update(before: discord.Member, after: discord.Member):
         data = await db.new_user(after.id, after.joined_at.timestamp(), datetime.now().timestamp())
         await after.add_roles(citizen)
         print(data)
+    if legionnaire in before.roles and not legionnaire in after.roles:
+        data = await db.remove_user(after.id)
+        await after.remove_roles(citizen)
+        print(data)
+    if federati in before.roles and not federati in after.roles:
+        data = await db.remove_user(after.id)
+        await after.remove_roles(citizen)
+        print(data)
     return
 
 @bot.tree.command(name = "request_list", description = "Get a list of open requests")
@@ -145,14 +154,15 @@ async def request_list(interaction: discord.Interaction):
     namePadding = 0
     requestPadding = 0
     claimantPadding = 0
+    name = ''
 
     data = await db.get_requests(int(interaction.guild.id))
     for r in data:
         if r.claimant_id == None:
             claim_name = "Unclaimed"
         else:
-            claim_name = interaction.guild.get_member(r.claimant_id).display_name
-        user_name = interaction.guild.get_member(r.requestor_id).display_name
+            claim_name = interaction.guild.get_member(r.claimant_id).display_name[0:12]
+        user_name = interaction.guild.get_member(r.requestor_id).display_name[0:14]
         resource = r.resource[0:40]
         namePadding = max(namePadding, len(user_name))
         requestPadding = max(requestPadding, len(resource))
@@ -174,7 +184,17 @@ async def request_list(interaction: discord.Interaction):
         else:
             resource = r.resource
         user_name = interaction.guild.get_member(r.requestor_id).display_name
-        output += f"\n {user_name: <{namePadding}} - {resource: <{requestPadding}} - {claim_name: <{claimantPadding}} - {r.id}"
+        if len(user_name) > 12:
+            name = user_name[0:14]
+            name += "..."
+        else:
+            name = user_name
+        if len(claim_name) > 12:
+            claimant = claim_name[0:12]
+            claimant += "..."
+        else:
+            claimant = claim_name
+        output += f"\n {name: <{namePadding}} - {resource: <{requestPadding}} - {claimant: <{claimantPadding}} - {r.id}"
         count += 1
 
         if count % 10 == 0:
@@ -187,12 +207,32 @@ async def request_list(interaction: discord.Interaction):
 
 @bot.tree.command(name = "request", description = "Request a resource")
 async def request(interaction: discord.Interaction, resource: str):
-    id = await db.insert_request(interaction.guild_id, interaction.user.id, resource)
+    id = await db.insert_request(interaction.guild_id, interaction.user.id, resource, datetime.now().timestamp())
     await interaction.response.send_message(f"""
     Requester: {interaction.user.mention}
     Resource: {resource}
     ID: {id}
-    """, ephemeral = True)
+    {interaction.guild.get_role(1386902362429325382).mention}""")
+
+@bot.tree.command(name = "cancel", description = "Cancel a resource request")
+async def cancel(interaction: discord.Interaction, id: int):
+    currentRequest = None
+    data = await db.get_user_requests(interaction.guild.id, interaction.user.id)
+    for d in data:
+        if d.id == id:
+            currentRequest = await db.cancel_request(interaction.guild.id, id)
+
+    if currentRequest == None:
+        await interaction.response.send_message("That ID didn't work, please double check it!", ephemeral=True)
+        return
+
+    await interaction.response.send_message(f"""
+    <@{currentRequest.requestor_id}>
+        Canceler: {interaction.user.display_name.capitalize()}
+        Resource: {currentRequest.resource}
+        ID: {id}
+    """)
+    print(f"{interaction.user.display_name} canceled a request")
 
 @bot.tree.command(name = "claim", description = "Claim a resource request")
 async def claim(interaction: discord.Interaction, id: int):
@@ -217,7 +257,7 @@ async def unclaim(interaction: discord.Interaction, id: int):
         await interaction.response.send_message("That ID didn't work, please double check it!", ephemeral = True)
         return
 
-    interaction.response.send_message(f"You have successfully unclaimed {currentRequest.resource} ({id})", ephemeral=True)
+    await interaction.response.send_message(f"You have successfully unclaimed {currentRequest.resource} ({id})", ephemeral=True)
 
 @bot.tree.command(name = "complete", description = "Complete a request")
 async def complete(interaction: discord.Interaction, id: int):
@@ -233,6 +273,7 @@ async def complete(interaction: discord.Interaction, id: int):
         Resource: {currentRequest.resource}
         ID: {id}
     """)
+    print(f"{interaction.user.display_name} completed a request")
 
 @bot.tree.command(name = "claims", description = "See which requests you've claimed")
 async def claims(interaction: discord.Interaction):
@@ -354,10 +395,17 @@ async def finishProject(interaction: discord.Interaction, project: int):
     name = await db.complete_project(project, interaction.guild_id)
     await interaction.response.send_message(f"You've marked project {name} - {project} as complete!")
 
+@bot.tree.command(name = "test", description= "test", guild=GUILD_ID)
+@app_commands.checks.has_role(1311825324308303913)
+async def test(interaction: discord.Interaction):
+
+
+    await interaction.response.send_message("Bingus.")
+
 @tasks.loop(minutes=67)
 async def legion_advert():
     global STATE
-    if int(datetime.now().timestamp()) - STATE['LAST_ANNOUNCE'] < 57600:
+    if int(datetime.now().timestamp()) - STATE['LAST_ANNOUNCE'] < 28800:
         return
     STATE['LAST_ANNOUNCE'] = int(datetime.now().timestamp())
     save_state(STATE)
@@ -365,11 +413,6 @@ async def legion_advert():
     pinged = random.choice(humans)
     await pinged.send("Hello! You've been chosen to advertize for Legion this time! Please make sure to post something unique/fun in the Legion's Looking For Group post in the main bitcraft server!")
     print(f"Pinged {pinged.name} to advertise.")
-
-@tasks.loop(minutes = 1)
-async def ping_metronome():
-    h = bot.get_user(201804073886941185)
-    await h.send("HI METRONOME WE LOVE YOU")
 
 @tasks.loop(time=ANNOY_TIME)
 async def ticket_remind():
@@ -398,6 +441,14 @@ async def ticket_remind():
             print(f"Pinged {h.name} to make a ticket.")
 
 @tasks.loop(time=ANNOY_TIME)
+async def purge_old_requests():
+    for g in bot.guilds:
+        data = db.get_requests(g.id)
+        for d in data:
+            if (datetime.now() - dt.timedelta(days=7)) < dt.datetime.fromtimestamp(d.claimed_at):
+                db.purge_old_requests(g.id, d[0])
+
+@tasks.loop(time=ANNOY_TIME)
 async def activity_update():
     humans = [m for m in LEGION_ID.members if (not m.bot and LEGION_ID.get_role(1268739778119995505)())]
 
@@ -419,6 +470,15 @@ async def activity_update():
             await db.change_user_activity("FALSE", h.id)
             return
 
+    remove_data = await db.get_all_users()
+    user_ids = []
+    for h in humans:
+        user_ids.append(h.id)
+
+    for d in remove_data:
+        if not d[0] in user_ids:
+            removed = await db.remove_user(d[0])
+            print(f"Removed user {removed[0]} from the guild database")
 
 @bot.command()
 async def synccmd(ctx: commands.Context):
@@ -618,7 +678,8 @@ async def count_professions(interaction: discord.Interaction):
         role = interaction.guild.get_role(v)
         output += f"{k.title():14} -"
         for m in role.members:
-            if interaction.guild.get_role(1268739778119995505) in m.roles:
+            data = await db.get_user_activity(m.id)
+            if (interaction.guild.get_role(1268739778119995505) in m.roles) and (data[0] == 1):
                 output += f" {m.display_name},"
                 count += 1
         output = output[:-1]
@@ -698,7 +759,10 @@ async def basic_active_check(interaction: discord.Interaction):
     count = 0
     for h in humans:
         data = await db.get_user_activity(h.id)
-        if data[0] == 1:
+        if data == None:
+            print(f"Something broke at user {h.name}")
+            continue
+        elif data[0] == 1:
             count += 1
 
     await interaction.followup.send(f"There are {count} active users.", ephemeral=True)
