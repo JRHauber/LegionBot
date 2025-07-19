@@ -14,6 +14,7 @@ import json
 import os
 from zoneinfo import ZoneInfo
 import time
+import enum
 
 intents = discord.Intents.default()
 intents.members = True
@@ -64,8 +65,8 @@ ACTIVITY_CHECK_START = dt.datetime(2025, 6, 15, 0, 0, 0, 0, ZoneInfo("America/Ch
 project_list = None
 votes = None
 candidates = None
-SENATOR_ROLE = 1311824922301038632
-ADMINISTRATOR_ROLE = 1371792303206699040
+SENATOR_ROLE = None
+ADMINISTRATOR_ROLE = None
 
 GUILD_ID = discord.Object(id=1267584422253694996)
 DISCIPLINARY_ROLES = [1367304039137542155, 1367304098659176641]
@@ -78,13 +79,37 @@ async def on_ready():
     global ADVERTIZER_ROLE
     global TICKET_ROLE
     global STATE
+    global SENATOR_ROLE
+    global ADMINISTRATOR_ROLE
     LEGION_ID = bot.get_guild(1267584422253694996)
     ADVERTIZER_ROLE = LEGION_ID.get_role(1360478811661144114)
     TICKET_ROLE = LEGION_ID.get_role(1324782094571798621)
+    SENATOR_ROLE = LEGION_ID.get_role(1311824922301038632)
+    ADMINISTRATOR_ROLE = LEGION_ID.get_role(1371792303206699040)
     STATE = load_state()
     legion_advert.start()
     ticket_remind.start()
     load_pickle_files()
+
+#@bot.event
+#async def on_reaction_add(reaction: discord.Reaction, user):
+#    if reaction.message.channel.id == 1394852266309320894:
+#        if not reaction.message.guild.get_role(SENATOR_ROLE) in user.roles:
+#            await reaction.remove(user)
+#    return
+
+@bot.event
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    guild = bot.get_guild(payload.guild_id)
+    message = payload.message_id
+    user = guild.get_member(payload.user_id)
+    try:
+        m = await guild.get_channel(1394852266309320894).fetch_message(message)
+        if not SENATOR_ROLE in user.roles:
+            for r in m.reactions:
+                await r.remove(user)
+    except:
+        return
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -103,11 +128,13 @@ async def on_guild_channel_create(channel):
                            Hello! Welcome to the Legion Discord Server! Please answer these questions to help us get this started!
         1) Have you read and agree to the ⁠rules?
         2) Are you over 18?
-        3) Are you planning on joining the Legion, are a member of one of its Allies, or are just here to Visit?
+        3) Are you joining The Legion, are a member of one of its Allies, or are just here to Visit?
         4) What is your username in Bitcraft?
         5) Are you currently a member of any other group?
         6) What is your primary (and secondary if applicable) language?
         7) What made you interested in joining The Legion? Were you invited by anyone?
+
+        If you are joining the Legion, please ensure that your discord name has your IGN somewhere in it.
                            """)
 
 @bot.event
@@ -305,12 +332,12 @@ async def new_project(interaction: discord.Interaction, name: str):
 @bot.tree.command(name = "add_resource", description = "Add a resource to the project")
 async def add_resource(interaction: discord.Interaction, resource: str, amount: int, project: int):
     await db.add_resource(resource, amount, project, interaction.guild_id)
-    await interaction.response.send_message(f"You have added the resource: {amount} - {resource} to project: {project}")
+    await interaction.response.send_message(f"You have added the resource: {amount} - {resource} to project: {project}", delete_after=60)
 
 @bot.tree.command(name = "remove_resource", description = "Remove a resource from a project")
 async def remove_resource(interaction: discord.Interaction, resource: str, project: int):
     await db.remove_resource(resource, project, interaction.guild_id)
-    await interaction.response.send_message(f"You have removed {resource} from project: {project}")
+    await interaction.response.send_message(f"You have removed {resource} from project: {project}", delete_after = 60)
 
 @bot.tree.command(name = "list_projects", description = "Display a list of active project")
 async def list_projects(interaction: discord.Interaction):
@@ -346,44 +373,54 @@ async def get_contributors(interaction: discord.Interaction, project: int):
             output += "```"
             await interaction.followup.send(output)
 
-@bot.tree.command(name = "get_contributions", description = "Get a list of what resources members have been contributed to this project")
-async def get_contributions(interaction: discord.Interaction, project: int):
-    await interaction.response.send_message("Fetching Contributions...", ephemeral=True)
-    data = await db.list_contributions(project, interaction.guild_id)
-    output = "```"
-    count = 0
-    lastid = None
-    for c in data:
-        if lastid != c[0] or count % 20 == 0:
-            lastid = c[0]
-            output += f"\n{interaction.guild.get_member(c[0]).display_name}"
-            count += 1
-        output += f"\n\t{c[1]} - {c[2]}"
-        count += 1
-        if count % 20 == 0:
-            output += "```"
-            await interaction.followup.send(output)
-            output = "```"
-        elif count >= len(data):
-            output += "```"
-            await interaction.followup.send(output)
+#@bot.tree.command(name = "get_contributions", description = "Get a list of what resources members have been contributed to this project")
+#async def get_contributions(interaction: discord.Interaction, project: int):
+#    await interaction.response.send_message("Fetching Contributions...", ephemeral=True)
+#    data = await db.list_contributions(project, interaction.guild_id)
+#    output = "```"
+#    count = 0
+#    lastid = None
+#    for c in data:
+#        if lastid != c[0] or count % 20 == 0:
+#            lastid = c[0]
+#            output += f"\n{interaction.guild.get_member(c[0]).display_name}"
+#            count += 1
+#        output += f"\n\t{c[1]} - {c[2]}"
+#        count += 1
+#        if count % 20 == 0:
+#            output += "```"
+#            await interaction.followup.send(output)
+#            output = "```"
+#        elif count >= len(data):
+#            output += "```"
+#            await interaction.followup.send(output)
 
 @bot.tree.command(name = "get_resources", description = "Get a list of what resources are in this project")
 async def get_resources(interaction: discord.Interaction, project: int):
     await interaction.response.send_message("Fetching Resources...", ephemeral=True)
     data = await db.list_resources(project, interaction.guild_id)
-    output = "```"
+    print(data)
+    if data == [] or data == None:
+        output = "That project either doesn't exist or is already complete."
+        await interaction.followup.send(output)
+        return
+    output = f"```\n{data[0][3]} - ({data[0][4]})\n"
     count = 0
     for r in data:
-        output += f"\n{r[0] : <16} - {r[1] : >7} / {r[2] : >7}"
+        if r[1] >= r[2]:
+            output = output
+        else:
+            output += f"\n{r[0] : <18} - {r[1] : >7} / {r[2] : >7}"
         count += 1
         if count % 20 == 0:
             output += "```"
-            await interaction.followup.send(output)
-            output = "```"
+            if output != "``````":
+                await interaction.followup.send(output)
+            output = f"```\n{r[3]} - ({r[4]})\n"
         elif count == len(data):
             output += "```"
-            await interaction.followup.send(output)
+            if output != "``````":
+                await interaction.followup.send(output)
 
 @bot.tree.command(name = "contribute", description = "Record your contributions to a project")
 async def contribute(interaction: discord.Interaction, project: int, resource: str, amount: int):
@@ -394,6 +431,12 @@ async def contribute(interaction: discord.Interaction, project: int, resource: s
 async def finishProject(interaction: discord.Interaction, project: int):
     name = await db.complete_project(project, interaction.guild_id)
     await interaction.response.send_message(f"You've marked project {name} - {project} as complete!")
+
+@bot.tree.command(name="search_user", description="bingus", guild=GUILD_ID)
+@app_commands.checks.has_role(1311825324308303913)
+async def search_user(interaction: discord.Interaction, uid: str):
+    user = interaction.guild.get_member(int(uid))
+    await interaction.response.send_message(f"That user is: {user.display_name}", ephemeral=True)
 
 @bot.tree.command(name = "test", description= "test", guild=GUILD_ID)
 @app_commands.checks.has_role(1311825324308303913)
@@ -454,10 +497,6 @@ async def activity_update():
 
     for h in humans:
         data = await db.get_user_activity(h.id)
-
-        #Grace Period Check
-        if (datetime.now() < ACTIVITY_CHECK_START + dt.timedelta(days = 30)) and data[1] == 0:
-            return
 
         #Check if they've talked since the Grace Period ended
         if data[1] == 0:
@@ -617,19 +656,16 @@ async def end_election(interaction: discord.Interaction, senator_count: int):
     save_state(STATE)
     output = ""
 
-    senate = interaction.guild.get_role(SENATOR_ROLE)
-    administrator = interaction.guild.get_role(ADMINISTRATOR_ROLE)
-
     sorted_candidates = sorted(candidates, key = lambda x: x.votes)
 
     await interaction.response.send_message("Tallying the votes!", delete_after=120)
 
     for m in interaction.guild.members:
-        if senate in m.roles:
-            await m.remove_roles(senate)
+        if SENATOR_ROLE in m.roles:
+            await m.remove_roles(SENATOR_ROLE)
             print(f"Removed senator role from: {m.display_name}")
-        if administrator in m.roles:
-            await m.remove_roles(administrator)
+        if ADMINISTRATOR_ROLE in m.roles:
+            await m.remove_roles(ADMINISTRATOR_ROLE)
             print(f"Removed administrator role from: {m.display_name}")
 
     if len(sorted_candidates) <= senator_count:
@@ -639,7 +675,7 @@ async def end_election(interaction: discord.Interaction, senator_count: int):
             print(m.display_name)
             print(output)
 
-            await m.add_roles(senate)
+            await m.add_roles(SENATOR_ROLE)
     else:
         count = 1
         for c in sorted_candidates:

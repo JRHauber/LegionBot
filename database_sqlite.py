@@ -203,7 +203,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT * FROM REQUESTS
-                WHERE server_id = {server_id} AND claimant_id = {uid} AND not filled
+                WHERE server_id = {server_id} AND claimant_id = {uid} AND not filled;
             """)
             data = res.fetchall()
             cursor.close()
@@ -217,7 +217,7 @@ class DatabaseSqlite(database.Database):
             cursor = self.db.cursor()
             res = cursor.execute(f"""
                 SELECT * FROM REQUESTS
-                WHERE server_id = {server_id} AND requestor_id = {uid} AND not filled
+                WHERE server_id = {server_id} AND requestor_id = {uid} AND not filled;
             """)
             data = res.fetchall()
             cursor.close()
@@ -373,10 +373,10 @@ class DatabaseSqlite(database.Database):
             """).fetchone()[0]
             if servcheck == server_id:
                 res = cursor.execute(f"""
-                SELECT resources.name, COALESCE(SUM(contributions.amount), 0), total_amount
+                SELECT resources.name, COALESCE(SUM(contributions.amount), 0), total_amount, projects.name, projects.project_id
                 FROM projects JOIN resources ON {pid} = resources.project_id
                 LEFT JOIN contributions ON resources.resource_id = contributions.resource_id
-                WHERE projects.project_id == {pid}
+                WHERE projects.project_id == {pid} AND projects.completed == FALSE
                 GROUP BY resources.name, resources.resource_id, total_amount
                 ORDER BY resources.name, total_amount;
             """)
