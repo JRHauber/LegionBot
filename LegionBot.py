@@ -114,7 +114,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 @bot.event
 async def on_message(message: discord.Message):
     if not message.author.bot:
-        if message.guild.get_role(1268739778119995505) in message.author.roles:
+        if message.guild.get_role(1268739778119995505) in message.author.roles and not STATE['ELECTION_STARTED']:
             await db.change_user_activity("TRUE", message.author.id)
             await db.user_recent_message(message.created_at.timestamp(), message.author.id)
 
@@ -569,17 +569,12 @@ async def candidate(interaction: discord.Interaction):
             await interaction.response.send_message("It looks like you're already a candidate, no need to put yourself in twice!", ephemeral=True)
             return
 
-    # Check if user is Vigiles
-    if interaction.guild.get_role(1382057254039064869) in interaction.user.roles:
-        await interaction.response.send_message("Sorry, you are a Vigil and are thus not eligible for senate", ephemeral=True)
-        return
-
     max_id = 0
     for x in candidates:
         if x.cid > max_id:
             max_id = x.cid
     max_id += 1
-    c = cand.Candidate(interaction.user.name, interaction.user.id, max_id)
+    c = cand.Candidate(interaction.user.display_name, interaction.user.id, max_id)
     candidates.append(c)
     print(f"{interaction.user.display_name} declared themselves a Candidate")
     await interaction.response.send_message(f"""
@@ -623,7 +618,7 @@ async def vote(interaction: discord.Interaction, cid: int):
     for c in candidates:
         if c.cid == cid:
             c.Vote(interaction.user.id)
-            await interaction.response.send_message(f"Thank you for voting for {c.name}", ephemeral=True)
+            await interaction.response.send_message(f"Thank you for voting for {interaction.guild.get_member(c.uid).display_name}", ephemeral=True)
             pickle.dump(candidates, open("candidates.p", "wb"))
             return
 
@@ -633,7 +628,7 @@ async def remove_vote(interaction: discord.Interaction, cid: int):
     for c in candidates:
         if c.cid == cid:
             c.RemoveVote(interaction.user.id)
-            await interaction.response.send_message(f"You have successfully remove your vote for {c.name}", ephemeral=True)
+            await interaction.response.send_message(f"You have successfully remove your vote for {interaction.guild.get_member(c.uid).display_name}", ephemeral=True)
             pickle.dump(candidates, open("candidates.p", "wb"))
             return
 
@@ -642,7 +637,7 @@ async def remove_vote(interaction: discord.Interaction, cid: int):
 async def list_candidates(interaction: discord.Interaction):
     output = ""
     for c in candidates:
-        output += f'{c.name} - {c.cid}\n'
+        output += f'{interaction.guild.get_member(c.uid).display_name} - {c.cid}\n'
     if candidates == []:
         output = "There's not an election going on or no one has declared themselves a candidate yet."
     await interaction.response.send_message(output, ephemeral=True)
@@ -670,19 +665,15 @@ async def end_election(interaction: discord.Interaction, senator_count: int):
 
     if len(sorted_candidates) <= senator_count:
         for c in sorted_candidates:
-            output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
-            m = interaction.guild.get_member(c.uid)
-            print(m.display_name)
-            print(output)
-
+            output += f'{interaction.guild.get_member(c.uid).display_name} - ({c.cid}) - Votes: {c.votes}\n'
             await m.add_roles(SENATOR_ROLE)
     else:
         count = 1
         for c in sorted_candidates:
             if count <= senator_count:
-                output += f'{c.name} - ({c.cid}) - Votes: {c.votes}\n'
+                output += f'{interaction.guild.get_member(c.uid).display_name} - ({c.cid}) - Votes: {c.votes}\n'
                 m = interaction.guild.get_member(c.uid)
-                await m.add_roles(senate)
+                await m.add_roles(SENATOR_ROLE)
 
     await interaction.followup.send(output)
     candidates = []
