@@ -488,7 +488,7 @@ async def purge_old_requests():
     for g in bot.guilds:
         data = db.get_requests(g.id)
         for d in data:
-            if (datetime.now() - dt.timedelta(days=7)) < dt.datetime.fromtimestamp(d.claimed_at):
+            if (datetime.now() - dt.timedelta(days=7)) > dt.datetime.fromtimestamp(d.created_at):
                 db.purge_old_requests(g.id, d[0])
 
 @tasks.loop(time=ANNOY_TIME)
